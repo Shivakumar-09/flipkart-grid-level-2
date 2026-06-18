@@ -1,0 +1,14 @@
+{
+    "AP40E7229": {
+        "name": "Registered Owner",
+        "phone": "+919876543210"
+    },
+    "MAP40E7229": {
+        "name": "Registered Owner",
+        "phone": "+919876543210"
+    },
+    "DEFAULT": {
+        "name": "Vehicle Owner",
+        "phone": "+919876543210"
+    }
+}

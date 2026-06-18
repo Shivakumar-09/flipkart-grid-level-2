@@ -1,0 +1,84 @@
+# ============================================================
+# TrafficFlow — AI-Powered Smart Traffic Intelligence Platform
+# .gitignore  |  Team Vardhamans  |  Flipkart Grid Hackathon
+# ============================================================
+
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Virtual Environments ─────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+.env
+.env.local
+
+# ── Database (auto-generated at runtime) ─────────────────────
+database/trafficflow.db
+database/*.db
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Generated Runtime Outputs ────────────────────────────────
+outputs/
+challans/
+ocr_debug/
+uploads/
+debug_images/
+
+# ── AI Model Weights (large binary files, download separately)─
+*.pt
+*.pth
+*.onnx
+*.weights
+*.h5
+
+# ── Temporary / Debug Images ─────────────────────────────────
+enhanced_plate.jpg
+ocr_result.jpg
+original_image.jpg
+plate_crop.jpg
+vehicle_crop.jpg
+*.tmp.jpg
+*.tmp.png
+
+# ── OS & IDE ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Node (if any frontend tooling) ───────────────────────────
+node_modules/
+
+# ── CSV Exports ──────────────────────────────────────────────
+violations.csv
+challans.csv
+*.csv
+
+# ── Secrets / Keys ───────────────────────────────────────────
+*.pem
+*.key
+secrets.py
+config_local.py

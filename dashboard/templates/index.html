@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrafficFlow — AI Powered Traffic Violation Intelligence Platform</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- CSS Style -->
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon"></div>
+                <div class="logo-text">Traffic<span>Flow</span></div>
+            </div>
+            <nav class="nav-links">
+                <a href="#command-center" class="active" id="nav-command-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+                    </svg>
+                    Dashboard
+                </a>
+
+                <a href="#pipeline" id="nav-pipeline">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                    </svg>
+                    Violation Uploader
+                </a>
+                <a href="#violations" id="nav-violations">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    Enforcement Log
+                </a>
+                <a href="#city-analytics" id="nav-analytics">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
+                    </svg>
+                    City Analytics
+                </a>
+                <a href="#safety-learning-hub" id="nav-safety">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                    </svg>
+                    Safety Learning Hub
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-label">
+                    <span class="pulse-icon"></span>
+                    Enforcement Engine Active
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard Area -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="header-title">
+                    <h1>Bengaluru Smart City Traffic Intel Dashboard</h1>
+                    <p>Bengaluru Traffic Intelligence Platform</p>
+                </div>
+            </header>
+
+            <!-- Traffic Command Center Section (Phase 5: Redesigned to Smart Traffic Command Center) -->
+            <section id="command-center" class="dashboard-section active">
+                <div class="metrics-grid">
+                    <div class="metric-card cyan">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">📋</div>
+                        <div class="data-box">
+                            <span class="label">Violations Today</span>
+                            <span class="value" id="cc-violations-today">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card emerald">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">📹</div>
+                        <div class="data-box">
+                            <span class="label">Active Cameras</span>
+                            <span class="value" id="cc-active-cameras">10 / 10</span>
+                        </div>
+                    </div>
+                    <div class="metric-card amber">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">⚠️</div>
+                        <div class="data-box">
+                            <span class="label">High Risk Zones</span>
+                            <span class="value" id="cc-risk-zones">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card red">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">⏳</div>
+                        <div class="data-box">
+                            <span class="label">Pending Challans</span>
+                            <span class="value" id="cc-pending-challans">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card cyan">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">🚨</div>
+                        <div class="data-box">
+                            <span class="label">Police Alerts</span>
+                            <span class="value" id="cc-police-alerts">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="command-center-layout">
+                    <!-- Leaflet Interactive Map -->
+                    <div class="map-card glass">
+                        <h3>🚦 Bengaluru Live Command Heatmap</h3>
+                        <div id="traffic-map"></div>
+                    </div>
+
+                    <!-- Alert Feed & Decision Support -->
+                    <div class="decision-support-card">
+                        <div class="glass feed-box">
+                            <h3>🚨 Real-Time Command Feed</h3>
+                            <div class="feed-list" id="cc-live-feed">
+                                <!-- Appended dynamically -->
+                            </div>
+                        </div>
+                        <div class="glass hotspots-box">
+                            <h3>📍 Top Hotspot Decision Matrix</h3>
+                            <div class="hotspots-list" id="cc-hotspots-list">
+                                <!-- Hotspots populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CCTV Live Streams Box -->
+                <div class="cctv-card glass" style="margin-bottom: 2rem; padding: 1.5rem;">
+                    <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--accent-cyan);">📹</span> Active CCTV Streams (AI Enforcement Grid)
+                    </h3>
+                    <div class="cctv-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 1.25rem;">
+                        <div class="cctv-feed" style="position: relative; aspect-ratio: 16/9; background: #020617; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                            <canvas id="cctv-canvas-1" style="width: 100%; height: 100%; display: block;"></canvas>
+                            <span style="position: absolute; top: 10px; left: 10px; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; background: rgba(2,6,23,0.85); color: #00f0ff; font-weight: 600; border: 1px solid rgba(0,240,255,0.3); font-family: monospace;">CAM_BLR_001 (Silk Board)</span>
+                            <span class="pulse-icon" style="position: absolute; top: 12px; right: 12px;"></span>
+                        </div>
+                        <div class="cctv-feed" style="position: relative; aspect-ratio: 16/9; background: #020617; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                            <canvas id="cctv-canvas-2" style="width: 100%; height: 100%; display: block;"></canvas>
+                            <span style="position: absolute; top: 10px; left: 10px; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; background: rgba(2,6,23,0.85); color: #00f0ff; font-weight: 600; border: 1px solid rgba(0,240,255,0.3); font-family: monospace;">CAM_BLR_002 (Electronic City)</span>
+                            <span class="pulse-icon" style="position: absolute; top: 12px; right: 12px;"></span>
+                        </div>
+                        <div class="cctv-feed" style="position: relative; aspect-ratio: 16/9; background: #020617; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                            <canvas id="cctv-canvas-3" style="width: 100%; height: 100%; display: block;"></canvas>
+                            <span style="position: absolute; top: 10px; left: 10px; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; background: rgba(2,6,23,0.85); color: #00f0ff; font-weight: 600; border: 1px solid rgba(0,240,255,0.3); font-family: monospace;">CAM_BLR_003 (Whitefield)</span>
+                            <span class="pulse-icon" style="position: absolute; top: 12px; right: 12px;"></span>
+                        </div>
+                        <div class="cctv-feed" style="position: relative; aspect-ratio: 16/9; background: #020617; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+                            <canvas id="cctv-canvas-4" style="width: 100%; height: 100%; display: block;"></canvas>
+                            <span style="position: absolute; top: 10px; left: 10px; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; background: rgba(2,6,23,0.85); color: #00f0ff; font-weight: 600; border: 1px solid rgba(0,240,255,0.3); font-family: monospace;">CAM_BLR_004 (Marathahalli)</span>
+                            <span class="pulse-icon" style="position: absolute; top: 12px; right: 12px;"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Command Charts -->
+                <div class="charts-grid" style="margin-bottom: 2rem;">
+                    <div class="chart-card glass">
+                        <h3>Weekly Trend Line</h3>
+                        <div class="chart-container">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card glass">
+                        <h3>Violation Categories Breakdown</h3>
+                        <div class="chart-container">
+                            <canvas id="breakdownChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Smart City Analytics Grid (Repeat Offenders, Patrol Deployments, Predictions) -->
+                <div class="intel-analytics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Repeat Offenders Panel (Phase 6) -->
+                    <div class="chart-card glass" style="padding: 1.5rem; display: flex; flex-direction: column;">
+                        <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">🚘 Repeat Offender Analytics</h3>
+                        <div id="repeat-offenders-container" style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px;">Fetching repeat offenders...</div>
+                        </div>
+                    </div>
+
+                    <!-- Patrol Deployment Recommendation Panel (Phase 7) -->
+                    <div class="chart-card glass" style="padding: 1.5rem; display: flex; flex-direction: column;">
+                        <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">👮 Police Patrol Deployment Recommendations</h3>
+                        <div id="patrol-deployments-container" style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 250px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px;">Loading dispatch allocations...</div>
+                        </div>
+                    </div>
+
+                    <!-- Predictive Traffic Intelligence Panel (Phase 8) -->
+                    <div class="chart-card glass" style="padding: 1.5rem; display: flex; flex-direction: column;">
+                        <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">🔮 Predictive Traffic Intelligence</h3>
+                        <div id="predictive-intel-container" style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px;">Computing violation forecasts...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deployed Officers Active Board -->
+                <div class="chart-card glass" style="padding: 1.5rem; margin-bottom: 2rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                        <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin: 0;">🟢 Active Officer Deployments Board</h3>
+                        <span id="deployed-count-badge" style="background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #10b981; font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 20px;">0 Deployed</span>
+                    </div>
+                    <div id="deployed-officers-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
+                        <div style="text-align: center; color: var(--text-muted); padding: 20px; grid-column: 1/-1;">No patrols dispatched yet. Use the Dispatch Patrol buttons above.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pipeline Violation Uploader Section -->
+            <section id="pipeline" class="dashboard-section">
+                <div class="uploader-container glass">
+                    <div class="uploader-left">
+                        <h2>Run Violation Inference Pipeline</h2>
+                        <p>Upload a street CCTV photo to auto-detect 7 violations, extract license plates, and generate
+                            legal evidence.</p>
+
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="drop-zone" id="drop-zone">
+                                <span class="drop-icon">📤</span>
+                                <span class="drop-text">Drag & drop files or click to upload</span>
+                                <input type="file" id="file-input" name="image" accept="image/*,video/*" required
+                                    style="display: none;">
+                            </div>
+                            <div class="form-inputs">
+                                <div class="input-group" style="flex: 1;">
+                                    <label for="camera-input">Select Camera Location</label>
+                                    <select id="camera-input" name="camera_id"
+                                        style="width: 100%; padding: 12px; border-radius: 8px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-primary); font-family: inherit;">
+                                        <option value="CAM_BLR_001">CAM_BLR_001 — Silk Board Junction</option>
+                                        <option value="CAM_BLR_002">CAM_BLR_002 — Electronic City</option>
+                                        <option value="CAM_BLR_003">CAM_BLR_003 — Whitefield</option>
+                                        <option value="CAM_BLR_004">CAM_BLR_004 — Marathahalli</option>
+                                        <option value="CAM_BLR_005">CAM_BLR_005 — Hebbal</option>
+                                        <option value="CAM_BLR_006">CAM_BLR_006 — KR Puram</option>
+                                        <option value="CAM_BLR_007">CAM_BLR_007 — Koramangala</option>
+                                        <option value="CAM_BLR_008">CAM_BLR_008 — HSR Layout</option>
+                                        <option value="CAM_BLR_009">CAM_BLR_009 — Majestic</option>
+                                        <option value="CAM_BLR_010">CAM_BLR_010 — Yelahanka</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn primary" id="btn-process">Execute Inference
+                                Pipeline</button>
+                        </form>
+                    </div>
+
+                    <div class="uploader-right" id="results-display">
+                        <div class="placeholder-msg">
+                            <span>📊 Inference output will be generated here</span>
+                        </div>
+                        <div class="results-content" style="display: none;">
+                            <h3>Pipeline Diagnostics</h3>
+                            <div class="diagnostics-summary">
+                                <span>Speed: <strong id="res-speed">--</strong></span>
+                                <span>Detections: <strong id="res-count">--</strong></span>
+                            </div>
+                            <div class="evidence-preview">
+                                <div class="img-frame" style="position: relative; width: 100%; height: 250px; background: #020617; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color);">
+                                    <img id="res-img" src="" alt="Annotated Evidence" style="width: 100%; height: 100%; object-fit: contain;">
+                                    <video id="res-video" controls autoplay style="display: none; width: 100%; height: 100%; object-fit: contain;"></video>
+                                </div>
+                                <div class="evidence-details">
+                                    <h4>Flagged Violations</h4>
+                                    <ul id="res-violations-list"></ul>
+                                </div>
+                            </div>
+
+                            <!-- Dedicated License Plate OCR Debugging Panel -->
+                            <div class="ocr-debug-panel"
+                                style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                                <h4
+                                    style="font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">
+                                    🔍 License Plate OCR Debugger</h4>
+                                <div style="display: flex; gap: 10px; margin: 10px 0;">
+                                    <div style="flex: 1; text-align: center;">
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">
+                                            Vehicle Crop</div>
+                                        <img id="ocr-vehicle-crop" src=""
+                                            style="width: 100%; height: 75px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                                    </div>
+                                    <div style="flex: 1; text-align: center;">
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">
+                                            Plate Crop</div>
+                                        <img id="ocr-plate-crop" src=""
+                                            style="width: 100%; height: 75px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                                    </div>
+                                    <div style="flex: 1; text-align: center;">
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">
+                                            Enhanced Plate</div>
+                                        <img id="ocr-enhanced-plate" src=""
+                                            style="width: 100%; height: 75px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                                    </div>
+                                </div>
+                                <div
+                                    style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 0.85rem; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <span>Detected Plate: <strong id="ocr-detected-plate"
+                                            style="color: var(--accent-cyan); font-family: monospace; font-size: 0.9rem;">--</strong></span>
+                                    <span>OCR Confidence: <strong id="ocr-confidence"
+                                            style="color: var(--accent-emerald); font-size: 0.9rem;">--</strong></span>
+                                    <span>Engine: <strong id="ocr-engine"
+                                            style="color: var(--text-primary); font-size: 0.9rem;">--</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Enforcement Log Section -->
+            <section id="violations" class="dashboard-section">
+                <div class="log-actions glass">
+                    <div class="search-box">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor" width="18">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
+                        </svg>
+                        <input type="text" id="search-input"
+                            placeholder="Search by plate number, violation type, or location...">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn secondary" id="btn-export-csv">Export CSV Report</button>
+                        <button class="btn secondary" id="btn-export-pdf">Generate PDF Package</button>
+                    </div>
+                </div>
+
+                <div class="table-container glass">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Challan ID</th>
+                                <th>Timestamp</th>
+                                <th>Location</th>
+                                <th>Camera ID</th>
+                                <th>Violation</th>
+                                <th>Plate</th>
+                                <th>Fine</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="violations-table-body">
+                            <tr>
+                                <td colspan="9" style="text-align: center; color: var(--text-muted);">Loading log
+                                    entries...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- City Analytics Section -->
+            <section id="city-analytics" class="dashboard-section">
+                <div class="analytics-grid-three">
+                    <!-- Top Congested Areas -->
+                    <div class="intel-card glass">
+                        <h3>📈 Top Congested Areas</h3>
+                        <ul class="intel-list" id="congested-list">
+                            <!-- Populated dynamically -->
+                        </ul>
+                    </div>
+
+                    <!-- Top Violation Areas -->
+                    <div class="intel-card glass">
+                        <h3>📍 Hotspot Violation Zones</h3>
+                        <ul class="intel-list" id="hotspots-list">
+                            <!-- Populated dynamically -->
+                        </ul>
+                    </div>
+
+                    <!-- Repeat Offenders -->
+                    <div class="intel-card glass">
+                        <h3>🚘 Top Repeat Offenders</h3>
+                        <ul class="intel-list" id="repeat-offenders-list">
+                            <!-- Populated dynamically -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Analytics Charts (Phase 5, 6 & 7) -->
+                <div class="chart-card glass" style="margin-bottom: 2rem; padding: 24px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 15px;">
+                        <h3 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #fff;">📊 Traffic Analytics
+                            Intelligence</h3>
+                        <div class="chart-tabs" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 5px;">
+                            <button class="filter-btn active chart-tab-btn" data-chart="hourly">Peak Hours</button>
+                            <button class="filter-btn chart-tab-btn" data-chart="weekday">Weekday Trends</button>
+                            <button class="filter-btn chart-tab-btn" data-chart="weekend">Weekend Trends</button>
+                            <button class="filter-btn chart-tab-btn" data-chart="monthly">Monthly Trends</button>
+                            <button class="filter-btn chart-tab-btn" data-chart="location">Location-wise</button>
+                            <button class="filter-btn chart-tab-btn" data-chart="comparison">Weekday vs Weekend</button>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="position: relative; height: 350px; width: 100%;">
+                        <canvas id="analyticsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Traffic Node Heatmap -->
+                <div class="heatmap-card glass">
+                    <h3>📹 Surveillance Camera Node Heatmap</h3>
+                    <div class="camera-grid" id="camera-heatmap-grid">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="analytics-layout">
+                    <!-- Live Alerts Feed -->
+                    <div class="glass analytics-left">
+                        <h3>🚨 Live Police Alerts Feed</h3>
+                        <div class="table-container scrollable-table">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Location</th>
+                                        <th>Severity</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alerts-table-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- SMS Transmission Logs -->
+                    <div class="glass analytics-right">
+                        <h3>💬 Twilio SMS Gateway Logs</h3>
+                        <div class="table-container scrollable-table">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Type</th>
+                                        <th>Recipient</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sms-table-body">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Safety Learning Hub Section (Feature 1 to 9) -->
+            <section id="safety-learning-hub" class="dashboard-section">
+                <!-- Large Featured Netflix-style Banner -->
+                <div class="featured-banner glass">
+                    <div class="banner-overlay"></div>
+                    <div class="banner-content">
+                        <span class="banner-tag">🔥 Featured Awareness Video</span>
+                        <h2>Road Safety: The Choice is Yours</h2>
+                        <p>Every year, thousands of lives are lost on roads due to simple negligences. This
+                            comprehensive AI-compiled documentary details the daily safety rules, lane discipline, and
+                            the critical importance of defensive driving.</p>
+                        <div class="banner-actions">
+                            <button class="btn primary btn-banner" id="btn-watch-featured" data-video="helmet_safety"
+                                data-category="Helmet Safety">▶ Play Safety Film</button>
+                            <a href="#rules-library" class="btn secondary btn-banner">📚 Browse Rules</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Analytics Grid (Feature 7) -->
+                <div class="analytics-grid-four">
+                    <div class="metric-card cyan">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">📺</div>
+                        <div class="data-box">
+                            <span class="label">Total Videos Watched</span>
+                            <span class="value" id="stats-videos-watched">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card emerald">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">🏆</div>
+                        <div class="data-box">
+                            <span class="label">Most Viewed Category</span>
+                            <span class="value text-value" id="stats-most-viewed-cat">None</span>
+                        </div>
+                    </div>
+                    <div class="metric-card amber">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">🚨</div>
+                        <div class="data-box">
+                            <span class="label">Most Common Violation</span>
+                            <span class="value text-value" id="stats-common-violation">None</span>
+                        </div>
+                    </div>
+                    <div class="metric-card red">
+                        <div class="card-bg"></div>
+                        <div class="icon-box">🎯</div>
+                        <div class="data-box">
+                            <span class="label">Safety Awareness Score</span>
+                            <span class="value" id="stats-safety-score">45%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Library Section (Feature 1) -->
+                <div class="glass safety-section-card">
+                    <h3 style="margin-bottom: 15px; font-size: 1.25rem;">🎬 Safety Video Library</h3>
+
+                    <!-- Category Filters -->
+                    <div class="category-filters">
+                        <button class="filter-btn active" data-category="all">All Categories</button>
+                        <button class="filter-btn" data-category="Helmet Safety">🪖 Helmet Safety</button>
+                        <button class="filter-btn" data-category="Triple Riding Risks">👨👩👧 Triple Riding
+                            Risks</button>
+                        <button class="filter-btn" data-category="Traffic Signal Rules">🚦 Traffic Signal Rules</button>
+                        <button class="filter-btn" data-category="Seatbelt Awareness">🚗 Seatbelt Awareness</button>
+                        <button class="filter-btn" data-category="Wrong Side Driving">🚧 Wrong Side Driving</button>
+                        <button class="filter-btn" data-category="Illegal Parking">🚙 Illegal Parking</button>
+                        <button class="filter-btn" data-category="Emergency Vehicle Awareness">🚑 Emergency
+                            Vehicles</button>
+                    </div>
+
+                    <!-- Video Grid Carousel -->
+                    <div class="video-grid" id="video-library-grid">
+                        <!-- Generated dynamically by app.js -->
+                    </div>
+                </div>
+
+                <!-- Traffic Rules Library (Feature 5) -->
+                <div class="glass safety-section-card" id="rules-library">
+                    <h3 style="margin-bottom: 20px; font-size: 1.25rem;">📘 BTP Traffic Rules Directory</h3>
+                    <div class="rules-grid" id="rules-directory-grid">
+                        <!-- Generated dynamically by app.js -->
+                    </div>
+                </div>
+
+                <!-- Road Safety Quiz (Feature 6) -->
+                <div class="glass safety-section-card">
+                    <div class="quiz-layout">
+                        <div class="quiz-panel">
+                            <h3 style="font-size: 1.25rem; margin-bottom: 10px;">✍️ Road Safety Awareness Challenge</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px;">Test your
+                                knowledge on traffic rules, limits, and defensive driving guidelines. Scoring 70%+
+                                awards the official awareness completion certificate.</p>
+
+                            <div class="quiz-box glass" id="quiz-box">
+                                <div id="quiz-start-screen" class="quiz-screen-center">
+                                    <span style="font-size: 3rem;">📝</span>
+                                    <h4 style="margin: 15px 0 10px 0; font-size: 1.15rem;">10 Questions Awareness Quiz
+                                    </h4>
+                                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;">Covers
+                                        MV Act fines, lane rules, and head injury facts.</p>
+                                    <button class="btn primary quiz-btn-start" id="btn-start-quiz">Start Safety
+                                        Challenge</button>
+                                </div>
+                                <div id="quiz-question-screen" style="display: none;">
+                                    <div class="quiz-progress-header">
+                                        <span id="quiz-progress-text">Question 1 of 10</span>
+                                        <span id="quiz-timer">Time: --</span>
+                                    </div>
+                                    <div class="quiz-progress-bar-bg">
+                                        <div class="quiz-progress-bar-fill" id="quiz-progress-bar" style="width: 10%;">
+                                        </div>
+                                    </div>
+                                    <h4 id="quiz-question-title" class="quiz-question-title">--</h4>
+                                    <div class="quiz-options-list" id="quiz-options-list">
+                                        <!-- Dynamic options -->
+                                    </div>
+                                    <button class="btn primary quiz-btn-next" id="btn-next-question">Next
+                                        Question</button>
+                                </div>
+                                <div id="quiz-result-screen" style="display: none;" class="quiz-screen-center">
+                                    <span id="quiz-result-emoji" class="quiz-result-emoji">🎉</span>
+                                    <h4 id="quiz-result-title" class="quiz-result-title">Challenge Completed!</h4>
+                                    <div class="quiz-score-percent" id="quiz-score-percent">80%</div>
+                                    <p class="quiz-result-desc" id="quiz-result-desc">You scored 8 out of 10 questions
+                                        correct.</p>
+                                    <div class="quiz-actions">
+                                        <button class="btn primary quiz-btn-action" id="btn-view-certificate"
+                                            style="display: none;">🎓 View Certificate</button>
+                                        <button class="btn secondary quiz-btn-action" id="btn-restart-quiz">Try
+                                            Again</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Certificate Visual Display (Feature 6) -->
+                        <div class="quiz-certificate-preview glass" id="certificate-preview-panel">
+                            <span style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 10px;">🎓</span>
+                            <h4 style="color: var(--text-muted); font-size: 0.95rem; text-align: center;">Safety
+                                Awareness Certificate</h4>
+                            <p
+                                style="color: var(--text-muted); font-size: 0.78rem; text-align: center; max-width: 240px; margin-top: 8px;">
+                                Score 70% or higher in the quiz challenge to generate your official BTP aligned safety
+                                certificate.</p>
+
+                            <!-- Certificate canvas -->
+                            <div id="cert-canvas-container" class="cert-canvas-container">
+                                <canvas id="certificate-canvas" class="cert-canvas"></canvas>
+                                <button class="btn secondary cert-btn-download" id="btn-download-cert">📥 Download
+                                    Certificate (PNG)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Image Modal for Evidence Review -->
+    <div id="image-modal" class="modal">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="modal-img">
+        <div id="modal-caption"></div>
+    </div>
+
+    <!-- Challan Details / Video Player Modal (Feature 2, 4 & 8) -->
+    <div id="challan-modal" class="modal">
+        <div class="modal-card glass">
+            <span class="close-modal" id="close-challan-modal">&times;</span>
+            <div class="modal-header">
+                <h2 id="modal-challan-id">CHALLAN DETAILS</h2>
+                <span id="modal-violation-badge" class="badge">--</span>
+            </div>
+
+            <div class="modal-body-grid">
+                <!-- Left side: Images / Video Player -->
+                <div class="modal-media-section">
+                    <div class="modal-tabs">
+                        <button class="tab-btn active" data-tab="tab-annotated">Annotated Image</button>
+                        <button class="tab-btn" data-tab="tab-original">Original Image</button>
+                        <button class="tab-btn" data-tab="tab-video" id="modal-tab-video-btn"
+                            style="display: none;">Road Safety Video</button>
+                    </div>
+                    <div class="tab-content active" id="tab-annotated">
+                        <img id="modal-annotated-img" class="modal-img-large" src="" alt="Annotated Evidence">
+                    </div>
+                    <div class="tab-content" id="tab-original">
+                        <img id="modal-original-img" class="modal-img-large" src="" alt="Original Frame">
+                    </div>
+                    <div class="tab-content" id="tab-video">
+                        <div class="video-wrapper">
+                            <div id="player-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right side: Telemetry and Recommendations -->
+                <div class="modal-info-section">
+                    <div class="info-block">
+                        <h4>Telemetry Statistics</h4>
+                        <div class="info-grid">
+                            <div><span class="label">Date & Time</span><span class="val" id="modal-timestamp">--</span>
+                            </div>
+                            <div><span class="label">Location</span><span class="val" id="modal-location">--</span>
+                            </div>
+                            <div><span class="label">Camera ID</span><span class="val" id="modal-camera-id">--</span>
+                            </div>
+                            <div><span class="label">Detected Plate</span><span class="val monospace"
+                                    id="modal-plate-number">--</span></div>
+                            <div><span class="label">OCR Confidence</span><span class="val"
+                                    id="modal-confidence">--</span></div>
+                            <div><span class="label">Fine Amount</span><span class="val text-danger"
+                                    id="modal-fine-amount" style="font-weight: 700;">--</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Feature 8: Recommended Safety Video Block -->
+                    <div class="recommendation-block glass">
+                        <h4>📚 Recommended Safety Video</h4>
+                        <div class="rec-card">
+                            <div class="rec-icon">🎓</div>
+                            <div class="rec-details">
+                                <h5 id="modal-rec-title">Why Helmets Save Lives</h5>
+                                <p id="modal-rec-desc">Violating this rule carries high crash injury risks. Watch this
+                                    safety presentation to learn why head protection is crucial.</p>
+                                <button class="btn secondary btn-sm" id="modal-btn-watch-rec"
+                                    style="width: auto; padding: 6px 12px; font-size: 0.8rem; margin-top: 8px;">📺 Watch
+                                    Now</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Traffic Assistant Floating Chat Widget (Phase 10) -->
+    <div class="chatbot-widget" id="chatbot-widget">
+        <div class="chatbot-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="pulse-icon"></span>
+                <h4 style="font-size: 0.95rem; font-weight:700; color:#fff; margin:0;">BTP AI Assistant</h4>
+            </div>
+            <button class="chatbot-toggle-btn" id="chatbot-close-btn" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.2rem;">&minus;</button>
+        </div>
+        <div class="chatbot-messages" id="chatbot-messages">
+            <div class="message bot">
+                Hello Officer! How can I assist you with Bengaluru Traffic Intelligence database queries today? Try asking about pending challans, total revenue, or helmet violations.
+            </div>
+        </div>
+        <form class="chatbot-input-form" id="chatbot-form">
+            <input type="text" id="chatbot-input" placeholder="Ask BTP AI Assistant..." autocomplete="off">
+            <button type="submit">Send</button>
+        </form>
+    </div>
+
+    <!-- Floating Button to Open Chatbot -->
+    <button class="chatbot-launcher" id="chatbot-launcher" title="BTP AI Assistant">
+        💬
+    </button>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; align-items: center; pointer-events: none;"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
