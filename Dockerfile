@@ -1,6 +1,6 @@
 # =============================================================
 # TrafficFlow — Dockerfile
-# Multi-stage build for Render deployment
+# Multi-stage build for Railway/Render deployment
 # =============================================================
 
 FROM python:3.11-slim
@@ -38,16 +38,11 @@ RUN python download_models.py
 
 # ── Ensure runtime output directories exist ──────────────────
 RUN mkdir -p outputs/uploads outputs/debug/helmet challans ocr_debug "$YOLO_CONFIG_DIR" \
- && chmod -R 777 "$YOLO_CONFIG_DIR"
+ && chmod -R 777 "$YOLO_CONFIG_DIR" \
+ && chmod +x start.sh
 
 # ── Expose port ──────────────────────────────────────────────
-EXPOSE 10000
+EXPOSE 5000
 
 # ── Start gunicorn ───────────────────────────────────────────
-CMD gunicorn app:app \
-    --workers=1 \
-    --threads=2 \
-    --timeout=120 \
-    --bind 0.0.0.0:${PORT:-10000} \
-    --log-level info \
-    --access-logfile -
+CMD ["sh", "./start.sh"]

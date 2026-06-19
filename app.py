@@ -244,6 +244,12 @@ def serve_challans(filename):
 def index():
     return render_template('index.html')
 
+# Platform health checks should not trigger database, OCR, or YOLO work.
+@app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({"status": "healthy"})
+
 # API: Summary Metrics
 @app.route('/api/metrics', methods=['GET'])
 @api_cache(timeout=300)
