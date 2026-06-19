@@ -1,0 +1,60 @@
+# ── Git ──────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── AI Model Weights (downloaded at Docker build time) ────────
+*.pt
+*.pth
+*.onnx
+*.weights
+*.h5
+
+# ── Runtime outputs (generated at runtime, not part of image) ─
+outputs/
+challans/
+ocr_debug/
+uploads/
+
+# ── Debug artifacts ───────────────────────────────────────────
+enhanced_plate.jpg
+ocr_result.jpg
+original_image.jpg
+plate_crop.jpg
+vehicle_crop.jpg
+*.tmp.jpg
+
+# ── Python cache ──────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# ── Virtual environments ──────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Database files ────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Secrets ───────────────────────────────────────────────────
+.env
+.env.*
+
+# ── OS & IDE ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.bak
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Scratch files ─────────────────────────────────────────────
+scratch_*.py
