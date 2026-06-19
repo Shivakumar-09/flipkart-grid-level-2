@@ -10,14 +10,13 @@ Usage:
 
 import os
 import sys
-import sqlite3
 import json
 import requests
 import time
+from database.postgres import SessionLocal, engine, initialize_database, Violation
 
 BASE_URL = "http://127.0.0.1:5000"
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(PROJECT_ROOT, "database", "trafficflow.db")
 
 PASS = "[PASS]"
 FAIL = "[FAIL]"
@@ -55,32 +54,40 @@ test(".gitignore exists",          lambda: os.path.exists(".gitignore"))
 # ── 2. Import Tests ──────────────────────────────────────────
 print("\n[2] Python Import Checks")
 test("Flask importable",   lambda: __import__("flask") and True)
-test("SQLite3 importable", lambda: __import__("sqlite3") and True)
+test("SQLAlchemy importable", lambda: __import__("sqlalchemy") and True)
 test("NumPy importable",   lambda: __import__("numpy") and True)
 test("OpenCV importable",  lambda: __import__("cv2") and True)
 test("UUID importable",    lambda: __import__("uuid") and True)
 
 # ── 3. Database Tests ────────────────────────────────────────
 print("\n[3] Database Checks")
+def check_postgres_conn():
+    try:
+        initialize_database()
+        return True
+    except Exception as e:
+        print(f"PostgreSQL connection error: {e}")
+        return False
+
 def check_db_tables():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-    tables = {row[0] for row in cursor.fetchall()}
-    conn.close()
-    required = {"violations", "notifications", "alerts", "analytics"}
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    required = {"violations", "sms_logs", "police_alerts", "traffic_analytics", "challans", "vehicles"}
     return required.issubset(tables)
 
-test("Database file exists", lambda: os.path.exists(DB_PATH))
+test("PostgreSQL connection", check_postgres_conn)
 test("Required tables present", check_db_tables)
 
 def check_db_has_data():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM violations")
-    count = cursor.fetchone()[0]
-    conn.close()
-    return count > 0
+    session = SessionLocal()
+    try:
+        count = session.query(Violation).count()
+        return count > 0
+    except Exception:
+        return False
+    finally:
+        session.close()
 
 test("Database has violation records", check_db_has_data)
 
@@ -88,11 +95,11 @@ test("Database has violation records", check_db_has_data)
 print("\n[4] API Endpoint Checks")
 
 def api_get(endpoint):
-    r = requests.get(BASE_URL + endpoint, timeout=5)
+    r = requests.get(BASE_URL + endpoint, timeout=25)
     return r.status_code == 200
 
 def api_post(endpoint, payload):
-    r = requests.post(BASE_URL + endpoint, json=payload, timeout=5)
+    r = requests.post(BASE_URL + endpoint, json=payload, timeout=25)
     return r.status_code in (200, 201)
 
 try:

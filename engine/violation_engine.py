@@ -215,6 +215,34 @@ class ViolationEngine:
                     cv2.putText(annotated_image, f"NO HELMET: Rider #{r_idx+1}", 
                                 (r_box[0], r_box[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
+        # Check Wrong Side Driving (Task 13)
+        wrong_side_detections = self._check_wrong_side(detections, w, h)
+        for ws in wrong_side_detections:
+            ws_box = ws["box"]
+            p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, ws_box)
+            ocr_metadata = {
+                "plate_number": p_num if o_conf >= 0.50 else "UNKNOWN",
+                "ocr_confidence": o_conf,
+                "ocr_engine": ocr_debug.get("ocr_engine", "none") if ocr_debug else "none",
+                "ocr_debug_paths": ocr_debug.get("debug_paths", {}) if ocr_debug else {},
+                "plate_crop_path": (ocr_debug.get("debug_paths", {}) or {}).get("plate_crop", ""),
+                "enhanced_plate_path": (ocr_debug.get("debug_paths", {}) or {}).get("enhanced_plate", ""),
+                "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", "")
+            }
+            
+            violations.append({
+                "type": "WRONG_SIDE_DRIVING",
+                "box": ws_box,
+                "confidence": float(ws["confidence"]),
+                "details": "Wrong side driving detected (vehicles must keep left)",
+                **ocr_metadata
+            })
+            
+            # Draw Red rectangle and text on annotated_image
+            cv2.rectangle(annotated_image, (ws_box[0], ws_box[1]), (ws_box[2], ws_box[3]), (0, 0, 255), 3) # Red
+            cv2.putText(annotated_image, "WRONG SIDE DRIVING", (ws_box[0], ws_box[1]-10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
         processing_time = (time.time() - start_time) * 1000 # convert to ms
         logger.info(f"Processed frame in {processing_time:.1f}ms. Found {len(violations)} violations.")
         

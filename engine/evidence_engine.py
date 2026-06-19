@@ -1,13 +1,13 @@
 import os
 import json
 import uuid
-import sqlite3
 import cv2
 import logging
 import numpy as np
 from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from database.postgres import SessionLocal, Vehicle, Violation, Challan, OCRResult, RepeatOffender
 
 logger = logging.getLogger("EvidenceEngine")
 
@@ -20,7 +20,6 @@ class EvidenceEngine:
         self.project_root = os.path.dirname(current_dir)
         
         # Ensure directories exist
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.challan_dir, exist_ok=True)
         
@@ -31,109 +30,20 @@ class EvidenceEngine:
         except Exception as e:
             logger.error(f"Failed to load camera_locations.json in EvidenceEngine: {e}")
             
-        self._initialize_db()
+        self.vehicle_contacts = {}
+        try:
+            contacts_path = os.path.join(self.project_root, "vehicle_contacts.json")
+            if os.path.exists(contacts_path):
+                with open(contacts_path, "r") as f:
+                    self.vehicle_contacts = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load vehicle_contacts.json: {e}")
 
-    def _initialize_db(self):
-        """
-        Recreates SQLite table with exact required fields for auto-challan workflow.
-        """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS violations (
-                id TEXT PRIMARY KEY,
-                challan_id TEXT NOT NULL UNIQUE,
-                plate_number TEXT,
-                violation_type TEXT NOT NULL,
-                amount INTEGER NOT NULL,
-                timestamp TEXT NOT NULL,
-                location TEXT NOT NULL,
-                camera_id TEXT NOT NULL,
-                status TEXT DEFAULT 'PENDING',
-                evidence_path TEXT NOT NULL,
-                confidence REAL NOT NULL
-            )
-        """)
-
-        cursor.execute("PRAGMA table_info(violations)")
-        violation_columns = {row[1] for row in cursor.fetchall()}
-        for column, column_type in {
-            "ocr_confidence": "REAL DEFAULT 0",
-            "ocr_engine": "TEXT",
-            "plate_crop_path": "TEXT",
-            "enhanced_plate_path": "TEXT",
-            "ocr_result_path": "TEXT"
-        }.items():
-            if column not in violation_columns:
-                cursor.execute(f"ALTER TABLE violations ADD COLUMN {column} {column_type}")
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS notifications (
-                notification_id TEXT PRIMARY KEY,
-                type TEXT NOT NULL,
-                recipient TEXT NOT NULL,
-                status TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                message TEXT,
-                plate_number TEXT,
-                challan_id TEXT
-            )
-        """)
-
-        cursor.execute("PRAGMA table_info(notifications)")
-        notification_columns = {row[1] for row in cursor.fetchall()}
-        for column, column_type in {
-            "message": "TEXT",
-            "plate_number": "TEXT",
-            "challan_id": "TEXT"
-        }.items():
-            if column not in notification_columns:
-                cursor.execute(f"ALTER TABLE notifications ADD COLUMN {column} {column_type}")
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS alerts (
-                alert_id TEXT PRIMARY KEY,
-                location TEXT NOT NULL,
-                severity TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                status TEXT NOT NULL
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS analytics (
-                id TEXT PRIMARY KEY,
-                location TEXT NOT NULL,
-                camera_id TEXT NOT NULL,
-                traffic_density REAL NOT NULL,
-                timestamp TEXT NOT NULL
-            )
-        """)
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS video_views (
-                id TEXT PRIMARY KEY,
-                video_id TEXT NOT NULL,
-                category TEXT NOT NULL,
-                timestamp TEXT NOT NULL
-            )
-        """)
-        
-        conn.commit()
-        conn.close()
-        logger.info("SQLite Database re-initialized with final auto-challan schema.")
-
-    def _generate_challan_id(self, offset=0):
+    def _generate_challan_id(self, session, offset=0):
         """
         Generates sequential Challan IDs like CHN-2026-00001
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM violations")
-        count = cursor.fetchone()[0]
-        conn.close()
-        
+        count = session.query(Violation).count()
         year = datetime.now().year
         challan_seq = count + 1 + offset
         return f"CHN-{year}-{challan_seq:05d}"
@@ -169,135 +79,199 @@ class EvidenceEngine:
             logger.error("Missing raw or annotated image frame parameters. Skipping evidence packaging.")
             return []
             
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        for idx, v in enumerate(process_result.get("violations", [])):
-            violation_id = str(uuid.uuid4())
-            challan_id = self._generate_challan_id(offset=idx)
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            fine_amount = self._get_fine_amount(v["type"])
-            
-            # Create a dedicated directory for this violation package
-            package_dir = os.path.join(self.output_dir, "evidence", violation_id)
-            os.makedirs(package_dir, exist_ok=True)
-            
-            # 1. Save original.jpg (vehicle crop or full image)
-            box = v["box"]
-            h_img, w_img, _ = original_image.shape
-            x1, y1 = max(0, box[0]), max(0, box[1])
-            x2, y2 = min(w_img, box[2]), min(h_img, box[3])
-            
-            orig_crop = original_image[y1:y2, x1:x2]
-            if orig_crop.size > 0:
-                cv2.imwrite(os.path.join(package_dir, "original.jpg"), orig_crop)
-            else:
-                cv2.imwrite(os.path.join(package_dir, "original.jpg"), original_image)
+        session = SessionLocal()
+        try:
+            for idx, v in enumerate(process_result.get("violations", [])):
+                violation_id = str(uuid.uuid4())
+                challan_id = self._generate_challan_id(session, offset=idx)
+                timestamp_dt = datetime.now()
+                timestamp_str = timestamp_dt.strftime("%Y-%m-%d %H:%M:%S")
+                fine_amount = self._get_fine_amount(v["type"])
                 
-            # 2. Save annotated.jpg (annotated vehicle box overlay)
-            anno_crop = annotated_image[y1:y2, x1:x2]
-            if anno_crop.size > 0:
-                cv2.imwrite(os.path.join(package_dir, "annotated.jpg"), anno_crop)
-            else:
-                cv2.imwrite(os.path.join(package_dir, "annotated.jpg"), annotated_image)
+                # Create a dedicated directory for this violation package
+                package_dir = os.path.join(self.output_dir, "evidence", violation_id)
+                os.makedirs(package_dir, exist_ok=True)
                 
-            # Save full original and annotated images for side-by-side display (Step 7)
-            cv2.imwrite(os.path.join(package_dir, "original_full.jpg"), original_image)
-            cv2.imwrite(os.path.join(package_dir, "annotated_full.jpg"), annotated_image)
+                # 1. Save original.jpg (vehicle crop or full image)
+                box = v["box"]
+                h_img, w_img, _ = original_image.shape
+                x1, y1 = max(0, box[0]), max(0, box[1])
+                x2, y2 = min(w_img, box[2]), min(h_img, box[3])
                 
-            # Determine safe plate number (fallback to UNKNOWN if None or empty)
-            plate_num = v.get("plate_number") or "UNKNOWN"
-            if not plate_num or plate_num.strip() == "":
-                plate_num = "UNKNOWN"
-
-            # 3. Save real OCR crops whenever the ANPR pipeline produced them.
-            ocr_debug_paths = v.get("ocr_debug_paths") or {}
-            copied_plate = self._copy_relative_artifact(
-                ocr_debug_paths.get("plate_crop") or v.get("plate_crop_path"),
-                package_dir,
-                "plate_crop.jpg"
-            )
-            copied_enhanced = self._copy_relative_artifact(
-                ocr_debug_paths.get("enhanced_plate") or v.get("enhanced_plate_path"),
-                package_dir,
-                "enhanced_plate.jpg"
-            )
-            copied_ocr_result = self._copy_relative_artifact(
-                ocr_debug_paths.get("ocr_result") or v.get("ocr_result_path"),
-                package_dir,
-                "ocr_result.jpg"
-            )
-
-            if not copied_plate:
-                v_h = y2 - y1
-                v_w = x2 - x1
-                plate_crop = orig_crop[int(v_h * 0.5):int(v_h * 0.95), int(v_w * 0.15):int(v_w * 0.85)] if orig_crop.size > 0 else None
-                if plate_crop is not None and plate_crop.size > 0:
-                    cv2.imwrite(os.path.join(package_dir, "plate_crop.jpg"), plate_crop)
+                orig_crop = original_image[y1:y2, x1:x2]
+                if orig_crop.size > 0:
+                    cv2.imwrite(os.path.join(package_dir, "original.jpg"), orig_crop)
                 else:
-                    mock_plate = np.zeros((40, 120, 3), dtype=np.uint8)
-                    cv2.rectangle(mock_plate, (0, 0), (120, 40), (255, 255, 255), -1)
-                    cv2.putText(mock_plate, plate_num, (5, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-                    cv2.imwrite(os.path.join(package_dir, "plate_crop.jpg"), mock_plate)
-
-            # 4. Generate challan.json
-            ocr_confidence = float(v.get("ocr_confidence", 0.0) or 0.0)
-            ocr_engine = v.get("ocr_engine") or "none"
-            challan_json = {
-                "violation_id": violation_id,
-                "challan_id": challan_id,
-                "plate_number": plate_num,
-                "violation_type": v["type"],
-                "type": v["type"],
-                "details": v.get("details", f"{v['type']} detected"),
-                "date": timestamp.split(" ")[0],
-                "time": timestamp.split(" ")[1],
-                "location": location,
-                "camera_id": camera_id,
-                "confidence_score": v["confidence"],
-                "ocr_confidence": ocr_confidence,
-                "ocr_engine": ocr_engine,
-                "fine_amount": fine_amount,
-                "status": "PENDING",
-                "plate_crop_path": os.path.join("outputs", "evidence", violation_id, "plate_crop.jpg").replace("\\", "/"),
-                "enhanced_plate_path": os.path.join("outputs", "evidence", violation_id, "enhanced_plate.jpg").replace("\\", "/") if copied_enhanced else "",
-                "ocr_result_path": os.path.join("outputs", "evidence", violation_id, "ocr_result.jpg").replace("\\", "/") if copied_ocr_result else "",
-                "original_full_path": os.path.join("outputs", "evidence", violation_id, "original_full.jpg").replace("\\", "/"),
-                "annotated_full_path": os.path.join("outputs", "evidence", violation_id, "annotated_full.jpg").replace("\\", "/")
-            }
-            
-            with open(os.path.join(package_dir, "challan.json"), 'w') as f:
-                json.dump(challan_json, f, indent=4)
+                    cv2.imwrite(os.path.join(package_dir, "original.jpg"), original_image)
+                    
+                # 2. Save annotated.jpg (annotated vehicle box overlay)
+                anno_crop = annotated_image[y1:y2, x1:x2]
+                if anno_crop.size > 0:
+                    cv2.imwrite(os.path.join(package_dir, "annotated.jpg"), anno_crop)
+                else:
+                    cv2.imwrite(os.path.join(package_dir, "annotated.jpg"), annotated_image)
+                    
+                # Save full original and annotated images for side-by-side display (Step 7)
+                cv2.imwrite(os.path.join(package_dir, "original_full.jpg"), original_image)
+                cv2.imwrite(os.path.join(package_dir, "annotated_full.jpg"), annotated_image)
+                    
+                # Determine safe plate number (fallback to UNKNOWN if None or empty)
+                plate_num = v.get("plate_number") or "UNKNOWN"
+                if not plate_num or plate_num.strip() == "":
+                    plate_num = "UNKNOWN"
+                plate_num = plate_num.strip().upper()
                 
-            # 5. Generate PDF Challan Document (Task 7)
-            pdf_path = os.path.join(self.challan_dir, f"{challan_id}.pdf")
-            # Save a copy of the annotated image to embed in the PDF
-            pdf_evidence_img = os.path.join(package_dir, "annotated.jpg")
-            self._generate_pdf(challan_id, challan_json, pdf_evidence_img, pdf_path)
+                # Fetch or create Vehicle in DB
+                vehicle = session.query(Vehicle).filter_by(plate_number=plate_num).first()
+                if not vehicle:
+                    contact = self.vehicle_contacts.get(plate_num, self.vehicle_contacts.get("DEFAULT", {}))
+                    vehicle = Vehicle(
+                        plate_number=plate_num,
+                        owner_name=contact.get("name", "Vehicle Owner"),
+                        owner_phone=contact.get("phone", "+919876543210")
+                    )
+                    session.add(vehicle)
+                    session.flush() # get vehicle.id
+                
+                # 3. Save real OCR crops whenever the ANPR pipeline produced them.
+                ocr_debug_paths = v.get("ocr_debug_paths") or {}
+                copied_plate = self._copy_relative_artifact(
+                    ocr_debug_paths.get("plate_crop") or v.get("plate_crop_path"),
+                    package_dir,
+                    "plate_crop.jpg"
+                )
+                copied_enhanced = self._copy_relative_artifact(
+                    ocr_debug_paths.get("enhanced_plate") or v.get("enhanced_plate_path"),
+                    package_dir,
+                    "enhanced_plate.jpg"
+                )
+                copied_ocr_result = self._copy_relative_artifact(
+                    ocr_debug_paths.get("ocr_result") or v.get("ocr_result_path"),
+                    package_dir,
+                    "ocr_result.jpg"
+                )
+                
+                if not copied_plate:
+                    v_h = y2 - y1
+                    v_w = x2 - x1
+                    plate_crop = orig_crop[int(v_h * 0.5):int(v_h * 0.95), int(v_w * 0.15):int(v_w * 0.85)] if orig_crop.size > 0 else None
+                    if plate_crop is not None and plate_crop.size > 0:
+                        cv2.imwrite(os.path.join(package_dir, "plate_crop.jpg"), plate_crop)
+                    else:
+                        mock_plate = np.zeros((40, 120, 3), dtype=np.uint8)
+                        cv2.rectangle(mock_plate, (0, 0), (120, 40), (255, 255, 255), -1)
+                        cv2.putText(mock_plate, plate_num, (5, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                        cv2.imwrite(os.path.join(package_dir, "plate_crop.jpg"), mock_plate)
+                        
+                # 4. Generate challan.json
+                ocr_confidence = float(v.get("ocr_confidence", 0.0) or 0.0)
+                ocr_engine = v.get("ocr_engine") or "none"
+                challan_json = {
+                    "violation_id": violation_id,
+                    "challan_id": challan_id,
+                    "plate_number": plate_num,
+                    "violation_type": v["type"],
+                    "type": v["type"],
+                    "details": v.get("details", f"{v['type']} detected"),
+                    "date": timestamp_str.split(" ")[0],
+                    "time": timestamp_str.split(" ")[1],
+                    "location": location,
+                    "camera_id": camera_id,
+                    "confidence_score": v["confidence"],
+                    "ocr_confidence": ocr_confidence,
+                    "ocr_engine": ocr_engine,
+                    "fine_amount": fine_amount,
+                    "status": "PENDING",
+                    "plate_crop_path": os.path.join("outputs", "evidence", violation_id, "plate_crop.jpg").replace("\\", "/"),
+                    "enhanced_plate_path": os.path.join("outputs", "evidence", violation_id, "enhanced_plate.jpg").replace("\\", "/") if copied_enhanced else "",
+                    "ocr_result_path": os.path.join("outputs", "evidence", violation_id, "ocr_result.jpg").replace("\\", "/") if copied_ocr_result else "",
+                    "original_full_path": os.path.join("outputs", "evidence", violation_id, "original_full.jpg").replace("\\", "/"),
+                    "annotated_full_path": os.path.join("outputs", "evidence", violation_id, "annotated_full.jpg").replace("\\", "/")
+                }
+                
+                with open(os.path.join(package_dir, "challan.json"), 'w') as f:
+                    json.dump(challan_json, f, indent=4)
+                    
+                # 5. Generate PDF Challan Document (Task 7)
+                pdf_path = os.path.join(self.challan_dir, f"{challan_id}.pdf")
+                # Save a copy of the annotated image to embed in the PDF
+                pdf_evidence_img = os.path.join(package_dir, "annotated.jpg")
+                self._generate_pdf(challan_id, challan_json, pdf_evidence_img, pdf_path)
+                
+                # 6. Database Storage (PostgreSQL Relational Structure)
+                rel_evidence_path = os.path.join("outputs", "evidence", violation_id).replace("\\", "/")
+                
+                violation_obj = Violation(
+                    id=violation_id,
+                    vehicle_id=vehicle.id,
+                    violation_type=v["type"],
+                    confidence=float(v["confidence"]),
+                    timestamp=timestamp_dt,
+                    location=location,
+                    camera_id=camera_id,
+                    evidence_path=rel_evidence_path
+                )
+                session.add(violation_obj)
+                
+                challan_obj = Challan(
+                    challan_id=challan_id,
+                    violation_id=violation_id,
+                    amount=fine_amount,
+                    status="PENDING",
+                    timestamp=timestamp_dt
+                )
+                session.add(challan_obj)
+                
+                ocr_res_obj = OCRResult(
+                    violation_id=violation_id,
+                    ocr_confidence=ocr_confidence,
+                    ocr_engine=ocr_engine,
+                    plate_crop_path=challan_json["plate_crop_path"],
+                    enhanced_plate_path=challan_json["enhanced_plate_path"],
+                    ocr_result_path=challan_json["ocr_result_path"]
+                )
+                session.add(ocr_res_obj)
+                
+                violations_recorded.append(challan_json)
+                logger.info(f"Generated Auto-Challan {challan_id} (Fine: {fine_amount}) for {plate_num}")
+                
+            # Update RepeatOffenders counts for all unique plates processed in this transaction
+            unique_plates = set(v["plate_number"] for v in violations_recorded if v["plate_number"] != "UNKNOWN")
+            for p_num in unique_plates:
+                # Find the vehicle
+                veh = session.query(Vehicle).filter_by(plate_number=p_num).first()
+                if not veh:
+                    continue
+                # Get existing violations count from DB
+                existing_count = session.query(Violation).filter_by(vehicle_id=veh.id).count()
+                new_count = sum(1 for v in violations_recorded if v["plate_number"] == p_num)
+                tot_count = existing_count + new_count
+                
+                # Get the last violation type for this plate in this run
+                last_v_type = [v["type"] for v in violations_recorded if v["plate_number"] == p_num][-1]
+                
+                offender = session.query(RepeatOffender).filter_by(plate_number=p_num).first()
+                if offender:
+                    offender.violations_count = tot_count
+                    offender.last_violation = last_v_type
+                    offender.blacklist_status = "BLACKLISTED" if tot_count >= 3 else "WARNING"
+                else:
+                    offender = RepeatOffender(
+                        plate_number=p_num,
+                        violations_count=tot_count,
+                        last_violation=last_v_type,
+                        blacklist_status="WARNING"
+                    )
+                    session.add(offender)
+                    
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Postgres Database transaction failed in EvidenceEngine: {e}")
+            raise e
+        finally:
+            session.close()
             
-            # 6. Database Storage (Task 5)
-            rel_evidence_path = os.path.join("outputs", "evidence", violation_id).replace("\\", "/")
-            cursor.execute("""
-                INSERT INTO violations (
-                    id, challan_id, plate_number, violation_type, 
-                    amount, timestamp, location, camera_id, status, 
-                    evidence_path, confidence, ocr_confidence, ocr_engine,
-                    plate_crop_path, enhanced_plate_path, ocr_result_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                violation_id, challan_id, plate_num, v["type"],
-                fine_amount, timestamp, location, camera_id, 'PENDING',
-                rel_evidence_path, v["confidence"], ocr_confidence, ocr_engine,
-                challan_json["plate_crop_path"], challan_json["enhanced_plate_path"],
-                challan_json["ocr_result_path"]
-            ))
-            
-            violations_recorded.append(challan_json)
-            logger.info(f"Generated Auto-Challan {challan_id} (Fine: {fine_amount}) for {plate_num}")
-            
-        conn.commit()
-        conn.close()
-        
         return violations_recorded
 
     def _copy_relative_artifact(self, relative_path, package_dir, filename):
@@ -385,10 +359,74 @@ class EvidenceEngine:
             c.setStrokeColorRGB(0.8, 0.8, 0.8)
             c.line(40, 480, 572, 480)
             
-            # Embed evidence image
-            if os.path.exists(img_path):
-                # Scale image to fit neatly on page
-                c.drawImage(img_path, 40, 150, width=532, height=310)
+            # Embed evidence images with dynamic aspect ratio preservation
+            def draw_image_aspect(c_obj, path, x, y, max_w, max_h, label):
+                # Draw label
+                c_obj.setFont("Helvetica-Bold", 8)
+                c_obj.setFillColorRGB(0.3, 0.3, 0.3)
+                c_obj.drawString(x, y + max_h + 4, label)
+                
+                # Draw background container box
+                c_obj.setFillColorRGB(0.97, 0.97, 0.97)
+                c_obj.setStrokeColorRGB(0.85, 0.85, 0.85)
+                c_obj.setLineWidth(0.5)
+                c_obj.rect(x, y, max_w, max_h, stroke=True, fill=True)
+                
+                if not path or not os.path.exists(path):
+                    c_obj.setFont("Helvetica-Oblique", 8)
+                    c_obj.setFillColorRGB(0.6, 0.6, 0.6)
+                    c_obj.drawCentredString(x + max_w / 2, y + max_h / 2 - 3, "Image Not Available")
+                    return False
+                
+                try:
+                    from reportlab.lib.utils import ImageReader
+                    img = ImageReader(path)
+                    w_img, h_img = img.getSize()
+                    if w_img <= 0 or h_img <= 0:
+                        raise ValueError("Invalid image dimensions")
+                    
+                    aspect = w_img / h_img
+                    if aspect > (max_w / max_h):
+                        draw_w = max_w
+                        draw_h = max_w / aspect
+                    else:
+                        draw_h = max_h
+                        draw_w = max_h * aspect
+                    
+                    # Center inside coordinates
+                    draw_x = x + (max_w - draw_w) / 2
+                    draw_y = y + (max_h - draw_h) / 2
+                    
+                    c_obj.drawImage(img, draw_x, draw_y, width=draw_w, height=draw_h)
+                    
+                    # Draw border around the actual drawn image
+                    c_obj.setStrokeColorRGB(0.7, 0.7, 0.7)
+                    c_obj.setLineWidth(0.5)
+                    c_obj.rect(draw_x, draw_y, draw_w, draw_h, stroke=True, fill=False)
+                    return True
+                except Exception as img_err:
+                    logger.error(f"Error drawing image {path} in PDF: {img_err}")
+                    c_obj.setFont("Helvetica-Oblique", 8)
+                    c_obj.setFillColorRGB(0.6, 0.6, 0.6)
+                    c_obj.drawCentredString(x + max_w / 2, y + max_h / 2 - 3, "Error Loading Image")
+                    return False
+
+            package_dir = os.path.dirname(img_path)
+            full_img_path = os.path.join(package_dir, "annotated_full.jpg")
+            if not os.path.exists(full_img_path):
+                full_img_path = img_path
+                
+            plate_img_path = os.path.join(package_dir, "plate_crop.jpg")
+            violation_crop_path = img_path
+
+            # Draw Left: Full scene / vehicle context (Main Evidence)
+            draw_image_aspect(c, full_img_path, 40, 150, 330, 240, "Full Scene Evidence Context")
+            
+            # Draw Right Top: License plate zoom (Complete vehicle number verification)
+            draw_image_aspect(c, plate_img_path, 390, 290, 182, 100, "License Plate Zoom")
+            
+            # Draw Right Bottom: Violation crop (Helmet / Triple riding details)
+            draw_image_aspect(c, violation_crop_path, 390, 150, 182, 120, "Violation Detail Crop")
                 
             # Footer branding
             c.setFillColorRGB(0.5, 0.5, 0.5)

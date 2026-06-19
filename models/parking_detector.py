@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 
 logger = logging.getLogger("ParkingDetector")
 
@@ -11,42 +12,36 @@ class ParkingDetector:
             [[0.5, 0.5], [0.95, 0.5], [0.95, 0.95], [0.5, 0.95]]
         ]
 
-    def check_illegal_parking(self, image, detections, custom_zones=None):
+    def check_illegal_parking(self, vehicle_bbox, camera_id, location, frame, custom_zones=None):
         """
-        Check if any vehicle is parked illegally within defined zones.
-        detections: list of dicts with 'box', 'label', 'confidence'
-        Returns:
-        - violations: list of dicts of illegally parked vehicles
+        Check if the specified vehicle is parked illegally within defined prohibited zones.
         """
-        h, w, _ = image.shape
-        zones = custom_zones if custom_zones is not None else self.default_zones
-        violations = []
-
-        # Convert normalized default zones to absolute pixel coordinates
+        h, w, _ = frame.shape
+        # Map specialized prohibited zones per camera_id for realistic coverage
+        camera_zones = {
+            "CAM_BLR_001": [[[0.4, 0.4], [0.95, 0.4], [0.95, 0.95], [0.4, 0.95]]], # Silk Board
+            "CAM_BLR_002": [[[0.5, 0.5], [0.98, 0.5], [0.98, 0.98], [0.5, 0.98]]], # Whitefield
+            "CAM_BLR_003": [[[0.3, 0.3], [0.85, 0.3], [0.85, 0.85], [0.3, 0.85]]], # Electronic City
+            "CAM_BLR_004": [[[0.5, 0.5], [0.95, 0.5], [0.95, 0.95], [0.5, 0.95]]], # Marathahalli
+        }
+        
+        zones = custom_zones if custom_zones is not None else camera_zones.get(camera_id, self.default_zones)
+        
+        # Convert normalized zones to absolute pixel coordinates
         pixel_zones = []
         for zone in zones:
             pixel_zone = [[int(pt[0] * w), int(pt[1] * h)] for pt in zone]
             pixel_zones.append(pixel_zone)
-
-        vehicles = [d for d in detections if d['label'] in ['car', 'truck', 'bus']]
-
-        for veh in vehicles:
-            box = veh['box']
-            # Calculate bottom center of the vehicle box (where the wheels touch the road)
-            cx = (box[0] + box[2]) // 2
-            cy = box[3]
-
-            for idx, zone in enumerate(pixel_zones):
-                if self._point_in_polygon(cx, cy, zone):
-                    logger.warning(f"Illegal parking detected for {veh['label']} at coordinate ({cx}, {cy})")
-                    violations.append({
-                        "vehicle_box": box,
-                        "vehicle_type": veh['label'],
-                        "zone_index": idx,
-                        "confidence": veh['confidence']
-                    })
-
-        return violations
+            
+        cx = (vehicle_bbox[0] + vehicle_bbox[2]) // 2
+        cy = vehicle_bbox[3]
+        
+        for zone in pixel_zones:
+            if self._point_in_polygon(cx, cy, zone):
+                logger.warning(f"Illegal parking detected for vehicle at ({cx}, {cy}) in camera {camera_id}")
+                return True, 0.92, zone
+                
+        return False, 0.0, None
 
     def _point_in_polygon(self, x, y, poly):
         """

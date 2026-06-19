@@ -1,13 +1,18 @@
 import os
-import sqlite3
 import csv
 import logging
 import json
 import uuid
 import warnings
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta, time
 from flask import Flask, request, jsonify, render_template, send_from_directory, Response
+from sqlalchemy import func
+from database.postgres import (
+    SessionLocal, Vehicle, Violation, Challan, OCRResult,
+    RepeatOffender, PoliceAlert, PatrolDispatch, Payment, SMSLog,
+    Analytics, SafetyVideoView, CameraNode
+)
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -75,18 +80,6 @@ except Exception as e:
     evidence_engine = None
     analytics_engine = None
 
-def _ensure_notification_columns(cursor):
-    cursor.execute("PRAGMA table_info(notifications)")
-    existing_columns = {row[1] for row in cursor.fetchall()}
-    optional_columns = {
-        "message": "TEXT",
-        "plate_number": "TEXT",
-        "challan_id": "TEXT"
-    }
-    for column, column_type in optional_columns.items():
-        if column not in existing_columns:
-            cursor.execute(f"ALTER TABLE notifications ADD COLUMN {column} {column_type}")
-
 def resolve_customer_contact(plate_number):
     plate_key = (plate_number or "UNKNOWN").strip().upper()
     contact = VEHICLE_CONTACTS.get(plate_key) or VEHICLE_CONTACTS.get("DEFAULT", {})
@@ -111,7 +104,7 @@ def build_challan_message(violation, customer, location):
 def send_sms(type_str, recipient, message, plate_number=None, challan_id=None):
     """
     Sends an SMS via Twilio (if credentials exist) or simulates it in demo mode.
-    Logs notification to the notifications database table.
+    Logs notification to the SMSLog database table.
     """
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
@@ -137,32 +130,30 @@ def send_sms(type_str, recipient, message, plate_number=None, challan_id=None):
         # Mock details to console
         logger.info(f"[DEMO SMS] To: {recipient} | Message: {message}")
     
-    # Log in notifications table
+    # Log in sms_logs table
     try:
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        session = SessionLocal()
         notification_id = str(uuid.uuid4())
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        _ensure_notification_columns(cursor)
-        cursor.execute("""
-            INSERT INTO notifications (
-                notification_id, type, recipient, status, timestamp,
-                message, plate_number, challan_id
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            notification_id, type_str, recipient, status, timestamp,
-            message, plate_number, challan_id
-        ))
-        conn.commit()
-        conn.close()
+        timestamp_dt = datetime.now()
+        log = SMSLog(
+            notification_id=notification_id,
+            type=type_str,
+            recipient=recipient,
+            status=status,
+            timestamp=timestamp_dt,
+            message=message,
+            plate_number=plate_number,
+            challan_id=challan_id
+        )
+        session.add(log)
+        session.commit()
+        session.close()
         return {
             "notification_id": notification_id,
             "type": type_str,
             "recipient": recipient,
             "status": status,
-            "timestamp": timestamp,
+            "timestamp": timestamp_dt.strftime("%Y-%m-%d %H:%M:%S"),
             "message": message,
             "plate_number": plate_number,
             "challan_id": challan_id
@@ -262,6 +253,16 @@ def get_analytics_details():
         "live_alerts": live_alerts,
         "sms_logs": sms_logs
     })
+
+# API: Model Evaluation details
+@app.route('/api/evaluation', methods=['GET'])
+def get_evaluation_details():
+    try:
+        from evaluation.metrics import calculate_metrics
+        return jsonify(calculate_metrics())
+    except Exception as e:
+        logger.error(f"Failed to fetch evaluation metrics: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # API: Traffic Command Center details (Phase 1, 2, 3, 4, 10, 11)
 @app.route('/api/command_center', methods=['GET'])
@@ -371,41 +372,58 @@ def get_detailed_charts():
 
 @app.route('/api/logs', methods=['GET'])
 def get_logs():
-    db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT id, challan_id, plate_number, violation_type, 
-               amount, timestamp, location, camera_id, status, 
-               evidence_path, confidence,
-               COALESCE(ocr_confidence, 0) AS ocr_confidence,
-               COALESCE(ocr_engine, 'none') AS ocr_engine,
-               COALESCE(plate_crop_path, '') AS plate_crop_path,
-               COALESCE(enhanced_plate_path, '') AS enhanced_plate_path,
-               COALESCE(ocr_result_path, '') AS ocr_result_path
-        FROM violations 
-        ORDER BY timestamp DESC
-    """)
-    rows = cursor.fetchall()
-    conn.close()
-    
-    logs = []
-    for row in rows:
-        d = dict(row)
-        # Reconstruct backward-compatible properties for dynamic dashboard JS script
-        d["violation_id"] = d["id"]
-        d["evidence_image_path"] = f"{d['evidence_path']}/annotated.jpg"
-        d["ocr_debug_paths"] = {
-            "plate_crop": d.get("plate_crop_path", ""),
-            "enhanced_plate": d.get("enhanced_plate_path", ""),
-            "ocr_result": d.get("ocr_result_path", ""),
-            "vehicle_crop": f"{d['evidence_path']}/original.jpg"
-        }
-        logs.append(d)
+    session = SessionLocal()
+    try:
+        results = session.query(
+            Violation, Vehicle, Challan, OCRResult
+        ).join(
+            Vehicle, Violation.vehicle_id == Vehicle.id, isouter=True
+        ).join(
+            Challan, Violation.id == Challan.violation_id, isouter=True
+        ).join(
+            OCRResult, Violation.id == OCRResult.violation_id, isouter=True
+        ).order_by(
+            Violation.timestamp.desc()
+        ).all()
         
-    return jsonify(logs)
+        logs = []
+        for violation, vehicle, challan, ocr_result in results:
+            d = {
+                "id": violation.id,
+                "violation_id": violation.id,
+                "violation_type": violation.violation_type,
+                "confidence": violation.confidence,
+                "timestamp": violation.timestamp.strftime("%Y-%m-%d %H:%M:%S") if violation.timestamp else "",
+                "location": violation.location,
+                "camera_id": violation.camera_id,
+                "evidence_path": violation.evidence_path,
+                "evidence_image_path": f"{violation.evidence_path}/annotated.jpg",
+                
+                "plate_number": vehicle.plate_number if vehicle else "UNKNOWN",
+                "challan_id": challan.challan_id if challan else "NONE",
+                "amount": challan.amount if challan else 0,
+                "status": challan.status if challan else "PENDING",
+                
+                "ocr_confidence": ocr_result.ocr_confidence if ocr_result else 0.0,
+                "ocr_engine": ocr_result.ocr_engine if ocr_result else "none",
+                "plate_crop_path": ocr_result.plate_crop_path if ocr_result else "",
+                "enhanced_plate_path": ocr_result.enhanced_plate_path if ocr_result else "",
+                "ocr_result_path": ocr_result.ocr_result_path if ocr_result else "",
+                
+                "ocr_debug_paths": {
+                    "plate_crop": ocr_result.plate_crop_path if ocr_result else "",
+                    "enhanced_plate": ocr_result.enhanced_plate_path if ocr_result else "",
+                    "ocr_result": ocr_result.ocr_result_path if ocr_result else "",
+                    "vehicle_crop": f"{violation.evidence_path}/original.jpg"
+                }
+            }
+            logs.append(d)
+        return jsonify(logs)
+    except Exception as e:
+        logger.error(f"Failed to fetch logs: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 # API: Image/Video Upload violation analysis pipeline (Phase 9 & Phase 1)
 @app.route('/api/upload', methods=['POST'])
@@ -577,34 +595,36 @@ def upload_frame():
             sent_notifications = []
             
             # --- SMART CITY EXTENSIONS (Phase 5, 6 & 7) ---
-            db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
             timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
             # 1. Log Traffic Density
             try:
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
+                session = SessionLocal()
                 analytics_id = str(uuid.uuid4())
-                cursor.execute("""
-                    INSERT INTO analytics (id, location, camera_id, traffic_density, timestamp)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (analytics_id, location, camera_id, float(process_result["detections_count"]), timestamp_str))
-                conn.commit()
-                conn.close()
+                an = Analytics(
+                    id=analytics_id,
+                    location=location,
+                    camera_id=camera_id,
+                    traffic_density=float(process_result["detections_count"]),
+                    timestamp=datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                )
+                session.add(an)
+                session.commit()
+                session.close()
             except Exception as ex:
                 logger.error(f"Error logging traffic density: {ex}")
                 
             # 2. Check Congestion Alert (Patrol dispatch)
             try:
-                today_str = datetime.now().strftime("%Y-%m-%d")
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT COUNT(*) FROM violations 
-                    WHERE location = ? AND timestamp LIKE ?
-                """, (location, today_str + "%"))
-                loc_violations_today = cursor.fetchone()[0]
-                conn.close()
+                session = SessionLocal()
+                today_start = datetime.combine(datetime.now().date(), time.min)
+                today_end = datetime.combine(datetime.now().date(), time.max)
+                loc_violations_today = session.query(Violation).filter(
+                    Violation.location == location,
+                    Violation.timestamp >= today_start,
+                    Violation.timestamp <= today_end
+                ).count()
+                session.close()
             except Exception as ex:
                 logger.error(f"Error checking violations count: {ex}")
                 loc_violations_today = 0
@@ -614,14 +634,17 @@ def upload_frame():
                     alert_id = str(uuid.uuid4())
                     severity = "HIGH" if (loc_violations_today >= 5 or process_result["detections_count"] > 8) else "MEDIUM"
                     alert_msg = f"High traffic congestion detected at {location}. Recommended traffic unit deployment."
-                    conn = sqlite3.connect(db_path)
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        INSERT INTO alerts (alert_id, location, severity, timestamp, status)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (alert_id, location, severity, timestamp_str, alert_msg))
-                    conn.commit()
-                    conn.close()
+                    session = SessionLocal()
+                    alert = PoliceAlert(
+                        alert_id=alert_id,
+                        location=location,
+                        severity=severity,
+                        timestamp=datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S"),
+                        status=alert_msg
+                    )
+                    session.add(alert)
+                    session.commit()
+                    session.close()
                     
                     # Send mock/real SMS alert to control center
                     sms_message = f"🚨 TRAFFICFLOW ALERT: {alert_msg}"
@@ -705,57 +728,73 @@ def upload_frame():
         traceback.print_exc()
         print("="*80)
         logger.error(f"Failed to process uploaded file: {e}")
-        return jsonify({"error": f"Internal pipeline execution error: {str(e)}"}), 500500
+        return jsonify({"error": f"Internal pipeline execution error: {str(e)}"}), 500
 
 # API: Export violations to CSV file
 @app.route('/api/export/csv', methods=['GET'])
 def export_csv():
-    db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, challan_id, plate_number, violation_type, 
-               amount, timestamp, location, camera_id, status 
-        FROM violations 
-        ORDER BY timestamp DESC
-    """)
-    rows = cursor.fetchall()
-    conn.close()
-    
-    # Generate CSV stream in memory
-    def generate():
-        data = [["Violation ID", "Challan ID", "License Plate", "Violation Type", "Fine Amount", "Timestamp", "Location", "Camera ID", "Status"]]
-        for row in rows:
-            data.append(list(row))
-            
-        import io
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerows(data)
-        return output.getvalue()
+    session = SessionLocal()
+    try:
+        results = session.query(
+            Violation, Vehicle, Challan
+        ).join(
+            Vehicle, Violation.vehicle_id == Vehicle.id, isouter=True
+        ).join(
+            Challan, Violation.id == Challan.violation_id, isouter=True
+        ).order_by(
+            Violation.timestamp.desc()
+        ).all()
         
-    return Response(
-        generate(),
-        mimetype="text/csv",
-        headers={"Content-disposition": "attachment; filename=trafficflow_violations_report.csv"}
-    )
+        # Generate CSV stream in memory
+        def generate():
+            data = [["Violation ID", "Challan ID", "License Plate", "Violation Type", "Fine Amount", "Timestamp", "Location", "Camera ID", "Status"]]
+            for violation, vehicle, challan in results:
+                data.append([
+                    violation.id,
+                    challan.challan_id if challan else "NONE",
+                    vehicle.plate_number if vehicle else "UNKNOWN",
+                    violation.violation_type,
+                    challan.amount if challan else 0,
+                    violation.timestamp.strftime("%Y-%m-%d %H:%M:%S") if violation.timestamp else "",
+                    violation.location,
+                    violation.camera_id,
+                    challan.status if challan else "PENDING"
+                ])
+                
+            import io
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerows(data)
+            return output.getvalue()
+            
+        return Response(
+            generate(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=trafficflow_violations_report.csv"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to export CSV: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 # API: Export violations PDF pack
 @app.route('/api/export/pdf', methods=['GET'])
 def export_pdf():
     # Simulated compilation of citation PDFs for officers
-    db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM violations")
-    count = cursor.fetchone()[0]
-    conn.close()
-    
-    return jsonify({
-        "status": "success",
-        "package_name": "TrafficFlow_Bengaluru_Evidence_Pack.pdf",
-        "records_compiled": count + 4820 # Baseline + actuals
-    })
+    session = SessionLocal()
+    try:
+        count = session.query(Violation).count()
+        return jsonify({
+            "status": "success",
+            "package_name": "TrafficFlow_Bengaluru_Evidence_Pack.pdf",
+            "records_compiled": count + 4820 # Baseline + actuals
+        })
+    except Exception as e:
+        logger.error(f"Failed to export PDF pack: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 # API: Expose Safety Rules Library (Feature 5)
 @app.route('/api/rules', methods=['GET'])
@@ -829,7 +868,7 @@ def handle_video_links():
                 with open(links_path, 'r') as f:
                     return jsonify(json.load(f))
             else:
-                return jsonify({})
+                return jsonify([])
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -837,55 +876,66 @@ def handle_video_links():
 @app.route('/api/video_views', methods=['POST'])
 def add_video_view():
     try:
-        data = request.json
+        data = request.json or {}
         video_id = data.get("video_id")
+        video_title = data.get("video_title")
         category = data.get("category")
-        if not video_id or not category:
-            return jsonify({"error": "Missing video_id or category"}), 400
+        watch_duration = float(data.get("watch_duration", 0.0))
+        completion_percentage = float(data.get("completion_percentage", 0.0))
+        
+        if not video_id or not video_title or not category:
+            return jsonify({"error": "Missing video_id, video_title, or category"}), 400
             
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        session = SessionLocal()
         view_id = str(uuid.uuid4())
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cursor.execute("""
-            INSERT INTO video_views (id, video_id, category, timestamp)
-            VALUES (?, ?, ?, ?)
-        """, (view_id, video_id, category, timestamp))
-        conn.commit()
-        conn.close()
-        return jsonify({"status": "success", "view_id": view_id, "timestamp": timestamp})
+        watch_timestamp = datetime.now()
+        view = SafetyVideoView(
+            id=view_id,
+            video_id=video_id,
+            video_title=video_title,
+            category=category,
+            watch_timestamp=watch_timestamp,
+            watch_duration=watch_duration,
+            completion_percentage=completion_percentage
+        )
+        session.add(view)
+        session.commit()
+        session.close()
+        return jsonify({"status": "success", "view_id": view_id, "watch_timestamp": watch_timestamp.strftime("%Y-%m-%d %H:%M:%S")})
     except Exception as e:
         logger.error(f"Failed to record video view: {e}")
         return jsonify({"error": str(e)}), 500
 
-# API: Video Analytics calculations (Feature 7)
+# API: Video Analytics calculations (Feature 7 - backward compatibility)
 @app.route('/api/video_analytics', methods=['GET'])
 def get_video_analytics():
+    session = SessionLocal()
     try:
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
         # 1. Total watched
-        cursor.execute("SELECT COUNT(*) FROM video_views")
-        total_watched = cursor.fetchone()[0]
+        total_watched = session.query(SafetyVideoView).count()
         
         # 2. Most viewed category
-        cursor.execute("SELECT category, COUNT(*) as count FROM video_views GROUP BY category ORDER BY count DESC LIMIT 1")
-        row_cat = cursor.fetchone()
-        most_viewed_cat = row_cat["category"] if row_cat else "None"
+        row_cat = session.query(
+            SafetyVideoView.category, func.count(SafetyVideoView.id).label('count')
+        ).group_by(SafetyVideoView.category).order_by(func.count(SafetyVideoView.id).desc()).first()
+        most_viewed_cat = row_cat.category if row_cat else "None"
         
         # 3. Most common violation
-        cursor.execute("SELECT violation_type, COUNT(*) as count FROM violations GROUP BY violation_type ORDER BY count DESC LIMIT 1")
-        row_violation = cursor.fetchone()
-        most_common_violation = row_violation["violation_type"] if row_violation else "None"
+        row_violation = session.query(
+            Violation.violation_type, func.count(Violation.id).label('count')
+        ).group_by(Violation.violation_type).order_by(func.count(Violation.id).desc()).first()
+        most_common_violation = row_violation.violation_type if row_violation else "None"
         
-        # 4. Safety Awareness Score (computed based on views)
-        safety_score = min(100, 45 + int(total_watched * 1.5))
+        # 4. Safety Awareness Score (computed based on average category completion)
+        category_completion = session.query(
+            SafetyVideoView.category, func.max(SafetyVideoView.completion_percentage).label('max_completion')
+        ).group_by(SafetyVideoView.category).all()
         
-        conn.close()
+        video_completion_sum = sum(min(100.0, float(c.max_completion or 0.0)) for c in category_completion)
+        overall_video_completion = video_completion_sum / 7.0 if category_completion else 0.0
+        
+        # Base score representing average video watch percentage + placeholder default
+        safety_score = min(100, int(overall_video_completion * 0.5 + 40))
         
         return jsonify({
             "total_videos_watched": total_watched,
@@ -896,31 +946,180 @@ def get_video_analytics():
     except Exception as e:
         logger.error(f"Failed to compute video analytics: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+# API: Advanced Safety and Citizen Awareness Analytics (New)
+@app.route('/api/safety_analytics', methods=['GET'])
+def get_safety_analytics_advanced():
+    session = SessionLocal()
+    try:
+        # 1. Total videos watched
+        total_watched = session.query(SafetyVideoView).count()
+        
+        # 2. Total watch time in seconds
+        total_duration = session.query(func.sum(SafetyVideoView.watch_duration)).scalar() or 0.0
+        
+        # Convert total duration to readable string e.g. "2h 15m 10s" or "45m 12s"
+        total_seconds = int(total_duration)
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        if hours > 0:
+            watch_time_str = f"{hours}h {minutes}m {seconds}s"
+        else:
+            watch_time_str = f"{minutes}m {seconds}s"
+            
+        # 3. Most viewed videos (group by video_title)
+        video_views = session.query(
+            SafetyVideoView.video_title,
+            SafetyVideoView.category,
+            func.count(SafetyVideoView.id).label('count')
+        ).group_by(SafetyVideoView.video_title, SafetyVideoView.category).order_by(func.count(SafetyVideoView.id).desc()).all()
+        
+        most_viewed_videos = []
+        for title, cat, count in video_views:
+            most_viewed_videos.append({
+                "video_title": title,
+                "category": cat,
+                "view_count": count
+            })
+            
+        # 4. Most popular categories
+        cat_views = session.query(
+            SafetyVideoView.category,
+            func.count(SafetyVideoView.id).label('count')
+        ).group_by(SafetyVideoView.category).order_by(func.count(SafetyVideoView.id).desc()).all()
+        
+        most_popular_categories = []
+        for cat, count in cat_views:
+            most_popular_categories.append({
+                "category": cat,
+                "view_count": count
+            })
+            
+        # 5. Completed categories details
+        completed_rows = session.query(
+            SafetyVideoView.category,
+            func.max(SafetyVideoView.completion_percentage).label('max_comp')
+        ).group_by(SafetyVideoView.category).all()
+        
+        completed_categories = []
+        video_completion_sum = 0.0
+        
+        for cat, max_comp in completed_rows:
+            comp_val = float(max_comp or 0.0)
+            video_completion_sum += min(100.0, comp_val)
+            if comp_val >= 90.0:
+                completed_categories.append(cat)
+                
+        # Overall video completion percentage (max 100)
+        overall_video_completion = video_completion_sum / 7.0 if completed_rows else 0.0
+        
+        # 6. Education vs Violation Trends by camera ward/location
+        loc_violations = session.query(
+            Violation.location, func.count(Violation.id).label('count')
+        ).group_by(Violation.location).all()
+        violations_map = {loc.split(",")[0].strip(): count for loc, count in loc_violations}
+        
+        all_wards = [
+            "Silk Board", "Whitefield", "Electronic City", "Marathahalli", 
+            "Hebbal", "KR Puram", "Koramangala", "HSR Layout", "Majestic", "Yelahanka"
+        ]
+        
+        awareness_trends = []
+        for idx, ward in enumerate(all_wards):
+            # Calculate actual violations count from DB
+            v_count = violations_map.get(ward, 0)
+            
+            # Formulate simulated awareness rate that is negatively correlated with violation count
+            import random
+            random.seed(idx + 100)
+            if v_count >= 100:
+                awareness_rate = random.randint(25, 45)
+            elif v_count >= 50:
+                awareness_rate = random.randint(46, 68)
+            elif v_count >= 20:
+                awareness_rate = random.randint(69, 84)
+            else:
+                awareness_rate = random.randint(85, 96)
+                
+            # Simulated violation reduction rate (due to safety education campaigns)
+            reduction_rate = max(5, min(95, int(awareness_rate * 0.85 + random.randint(-5, 5))))
+            
+            awareness_trends.append({
+                "location": ward,
+                "violation_count": v_count,
+                "awareness_rate": awareness_rate,
+                "reduction_percentage": reduction_rate
+            })
+            
+        # Sort awareness trends by awareness_rate descending
+        awareness_trends.sort(key=lambda x: x["awareness_rate"], reverse=True)
+        
+        return jsonify({
+            "total_videos_watched": total_watched,
+            "total_watch_time": total_duration,
+            "total_watch_time_formatted": watch_time_str,
+            "most_viewed_videos": most_viewed_videos,
+            "most_popular_categories": most_popular_categories,
+            "completed_categories": completed_categories,
+            "completed_categories_count": len(completed_categories),
+            "video_completion_rate": round(overall_video_completion, 1),
+            "category_completion": {cat: float(max_comp or 0.0) for cat, max_comp in completed_rows},
+            "awareness_trends": awareness_trends
+        })
+    except Exception as e:
+        logger.error(f"Failed to fetch safety analytics: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 # API: Challan details route
 @app.route('/challan/<challan_id>')
 def challan_details(challan_id):
-    db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, challan_id, plate_number, violation_type, 
-               amount, timestamp, location, camera_id, status, 
-               evidence_path, confidence, ocr_confidence
-        FROM violations WHERE challan_id = ?
-    """, (challan_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        return "Challan Not Found", 404
+    session = SessionLocal()
+    try:
+        row = session.query(
+            Violation, Vehicle, Challan, OCRResult
+        ).join(
+            Challan, Violation.id == Challan.violation_id
+        ).join(
+            Vehicle, Violation.vehicle_id == Vehicle.id, isouter=True
+        ).join(
+            OCRResult, Violation.id == OCRResult.violation_id, isouter=True
+        ).filter(
+            Challan.challan_id == challan_id
+        ).first()
         
-    v_dict = dict(row)
-    v_dict["violation_id"] = v_dict["id"]
-    contact = resolve_customer_contact(v_dict["plate_number"])
-    v_dict["owner_name"] = contact["name"]
-    v_dict["owner_phone"] = contact["phone"]
-    return render_template('challan.html', challan=v_dict)
+        if not row:
+            return "Challan Not Found", 404
+            
+        violation, vehicle, challan, ocr_result = row
+        v_dict = {
+            "id": violation.id,
+            "violation_id": violation.id,
+            "challan_id": challan.challan_id,
+            "plate_number": vehicle.plate_number if vehicle else "UNKNOWN",
+            "violation_type": violation.violation_type,
+            "amount": challan.amount,
+            "timestamp": violation.timestamp.strftime("%Y-%m-%d %H:%M:%S") if violation.timestamp else "",
+            "location": violation.location,
+            "camera_id": violation.camera_id,
+            "status": challan.status,
+            "evidence_path": violation.evidence_path,
+            "confidence": violation.confidence,
+            "ocr_confidence": ocr_result.ocr_confidence if ocr_result else 0.0,
+            
+            "owner_name": vehicle.owner_name if vehicle else "Vehicle Owner",
+            "owner_phone": vehicle.owner_phone if vehicle else "+919876543210"
+        }
+        return render_template('challan.html', challan=v_dict)
+    except Exception as e:
+        logger.error(f"Failed to fetch challan details: {e}")
+        return "Internal Error", 500
+    finally:
+        session.close()
 
 # API: Pay Challan (Razorpay Standard Mock Checkout Integration)
 @app.route('/api/pay_challan', methods=['POST'])
@@ -931,21 +1130,35 @@ def pay_challan():
         if not challan_id:
             return jsonify({"error": "Missing challan_id"}), 400
             
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT plate_number, amount, location, violation_type FROM violations WHERE challan_id = ?", (challan_id,))
-        row = cursor.fetchone()
-        if not row:
-            conn.close()
+        session = SessionLocal()
+        challan_record = session.query(Challan).filter_by(challan_id=challan_id).first()
+        if not challan_record:
+            session.close()
             return jsonify({"error": "Challan not found"}), 404
+            
+        violation = session.query(Violation).filter_by(id=challan_record.violation_id).first()
+        vehicle = session.query(Vehicle).filter_by(id=violation.vehicle_id).first() if violation else None
         
-        plate_number, amount, location, violation_type = row
+        plate_number = vehicle.plate_number if vehicle else "UNKNOWN"
+        amount = challan_record.amount
+        location = violation.location if violation else "UNKNOWN"
+        violation_type = violation.violation_type if violation else "VIOLATION"
         
         # Update status
-        cursor.execute("UPDATE violations SET status = 'PAID' WHERE challan_id = ?", (challan_id,))
-        conn.commit()
-        conn.close()
+        challan_record.status = 'PAID'
+        
+        # Record payment transaction
+        payment_id = f"PAY-{str(uuid.uuid4())[:8]}"
+        payment = Payment(
+            payment_id=payment_id,
+            challan_id=challan_id,
+            amount=amount,
+            timestamp=datetime.now(),
+            status="SUCCESS"
+        )
+        session.add(payment)
+        session.commit()
+        session.close()
         
         # Resolve owner contact
         customer = resolve_customer_contact(plate_number)
@@ -976,23 +1189,34 @@ def dispatch_patrol():
         if not location:
             return jsonify({"error": "Missing location"}), 400
             
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Log to alerts table
-        alert_id = str(uuid.uuid4())
-        severity = "HIGH"
-        timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        session = SessionLocal()
+        dispatch_id = str(uuid.uuid4())
+        timestamp = datetime.now()
         status_msg = f"Patrol unit dispatched to {location}: {action}"
         
-        cursor.execute("""
-            INSERT INTO alerts (alert_id, location, severity, timestamp, status)
-            VALUES (?, ?, ?, ?, ?)
-        """, (alert_id, location, severity, timestamp_str, status_msg))
+        # Write to PoliceAlert
+        alert = PoliceAlert(
+            alert_id=dispatch_id,
+            location=location,
+            severity="HIGH",
+            timestamp=timestamp,
+            status=status_msg
+        )
+        session.add(alert)
         
-        conn.commit()
-        conn.close()
+        # Write to PatrolDispatch
+        dispatch = PatrolDispatch(
+            dispatch_id=dispatch_id,
+            location=location,
+            action=action,
+            camera_id=camera_id,
+            timestamp=timestamp,
+            status=status_msg
+        )
+        session.add(dispatch)
+        
+        session.commit()
+        session.close()
         
         # Send dispatch SMS
         sms_msg = f"🚨 BTP DISPATCH: Patrol unit deployed to {location} node for urgent action: {action}."
@@ -1000,7 +1224,7 @@ def dispatch_patrol():
         
         return jsonify({
             "status": "success",
-            "alert_id": alert_id,
+            "alert_id": dispatch_id,
             "message": status_msg,
             "notification": noti
         })
@@ -1023,32 +1247,27 @@ def get_repeat_offenders_api():
 # API: Active Deployed Patrols Board (Phase 7 — shows dispatched officer locations)
 @app.route('/api/deployed_patrols', methods=['GET'])
 def get_deployed_patrols():
+    session = SessionLocal()
     try:
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT location, severity, timestamp, status, alert_id
-            FROM alerts
-            WHERE status LIKE 'Patrol unit dispatched to %'
-            ORDER BY timestamp DESC
-            LIMIT 20
-        """)
-        rows = cursor.fetchall()
-        conn.close()
+        results = session.query(PatrolDispatch).order_by(
+            PatrolDispatch.timestamp.desc()
+        ).limit(20).all()
+        
         deployed = []
-        for row in rows:
+        for row in results:
             deployed.append({
-                "location": row[0],
-                "severity": row[1],
-                "timestamp": row[2],
-                "status": row[3],
-                "alert_id": row[4]
+                "location": row.location,
+                "severity": "HIGH",
+                "timestamp": row.timestamp.strftime("%Y-%m-%d %H:%M:%S") if row.timestamp else "",
+                "status": row.status,
+                "alert_id": row.dispatch_id
             })
         return jsonify({"deployed": deployed, "count": len(deployed)})
     except Exception as e:
         logger.error(f"Failed to fetch deployed patrols: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
 
 # API: Police patrol deployment recommendation engine
 @app.route('/api/recommendations', methods=['GET'])
@@ -1059,15 +1278,14 @@ def get_recommendations():
     
     # Query database for dispatched locations
     dispatched_locations = set()
+    session = SessionLocal()
     try:
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT location FROM alerts WHERE status LIKE 'Patrol unit dispatched to %'")
-        dispatched_locations = {row[0] for row in cursor.fetchall()}
-        conn.close()
+        results = session.query(PatrolDispatch.location).distinct().all()
+        dispatched_locations = {r[0] for r in results}
     except Exception as db_err:
         logger.error(f"Failed to query dispatched locations: {db_err}")
+    finally:
+        session.close()
 
     recommendations = []
     for h in hotspots:
@@ -1138,7 +1356,7 @@ def get_predictions():
         }
     })
 
-# API: AI Traffic Assistant Chatbot with SQLite query integration
+# API: AI Traffic Assistant Chatbot with PostgreSQL query integration
 @app.route('/api/ai_assistant', methods=['POST'])
 def ai_assistant():
     try:
@@ -1147,63 +1365,41 @@ def ai_assistant():
         if not query:
             return jsonify({"response": "Hello Officer! How can I assist you with Bengaluru Traffic Intelligence today?"})
             
-        db_path = os.path.join(DATABASE_DIR, "trafficflow.db")
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
+        session = SessionLocal()
         response_text = ""
         
         if "unpaid" in query or "pending" in query:
-            cursor.execute("SELECT COUNT(*) FROM violations WHERE status = 'PENDING'")
-            cnt = cursor.fetchone()[0]
-            cursor.execute("SELECT SUM(amount) FROM violations WHERE status = 'PENDING'")
-            revenue = cursor.fetchone()[0] or 0
+            cnt = session.query(Challan).filter_by(status='PENDING').count()
+            revenue = session.query(func.sum(Challan.amount)).filter_by(status='PENDING').scalar() or 0
             response_text = f"There are currently **{cnt} pending unpaid challans** in the system, totaling **INR {revenue}** in unpaid fines."
             
         elif "paid" in query:
-            cursor.execute("SELECT COUNT(*) FROM violations WHERE status = 'PAID'")
-            cnt = cursor.fetchone()[0]
-            cursor.execute("SELECT SUM(amount) FROM violations WHERE status = 'PAID'")
-            revenue = cursor.fetchone()[0] or 0
+            cnt = session.query(Challan).filter_by(status='PAID').count()
+            revenue = session.query(func.sum(Challan.amount)).filter_by(status='PAID').scalar() or 0
             response_text = f"A total of **{cnt} challans have been paid** successfully, generating **INR {revenue}** in traffic enforcement revenue."
             
         elif "helmet" in query:
-            cursor.execute("SELECT COUNT(*) FROM violations WHERE violation_type = 'HELMET_VIOLATION'")
-            cnt = cursor.fetchone()[0]
+            cnt = session.query(Violation).filter_by(violation_type='HELMET_VIOLATION').count()
             response_text = f"Our AI models have detected **{cnt} Helmet Violations** across all monitored intersections."
             
         elif "silk" in query or "board" in query:
-            cursor.execute("SELECT COUNT(*) FROM violations WHERE location LIKE '%Silk Board%'")
-            cnt = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM violations WHERE location LIKE '%Silk Board%' AND status = 'PENDING'")
-            pending = cursor.fetchone()[0]
+            cnt = session.query(Violation).filter(Violation.location.like('%Silk Board%')).count()
+            pending = session.query(Challan).join(Violation).filter(Violation.location.like('%Silk Board%'), Challan.status == 'PENDING').count()
             response_text = f"**Silk Board Junction** has recorded **{cnt} total violations**, with **{pending}** still pending payment resolution."
             
         elif "total" in query or "count" in query or "how many violations" in query:
-            cursor.execute("SELECT COUNT(*) FROM violations")
-            cnt = cursor.fetchone()[0]
+            cnt = session.query(Violation).count()
             response_text = f"The TrafficFlow database currently registers a total of **{cnt} infraction events** across Bengaluru."
             
         elif "fine" in query or "revenue" in query or "amount" in query:
-            cursor.execute("SELECT SUM(amount) FROM violations")
-            total = cursor.fetchone()[0] or 0
-            cursor.execute("SELECT SUM(amount) FROM violations WHERE status = 'PAID'")
-            paid = cursor.fetchone()[0] or 0
+            total = session.query(func.sum(Challan.amount)).scalar() or 0
+            paid = session.query(func.sum(Challan.amount)).filter_by(status='PAID').scalar() or 0
             response_text = f"The total fines levied amount to **INR {total}**, out of which **INR {paid}** has been recovered (paid)."
             
         elif "repeat" in query or "offender" in query:
-            cursor.execute("""
-                SELECT plate_number, COUNT(*) as count 
-                FROM violations 
-                WHERE plate_number != 'UNKNOWN' 
-                GROUP BY plate_number 
-                HAVING count > 1 
-                ORDER BY count DESC 
-                LIMIT 3
-            """)
-            rows = cursor.fetchall()
+            rows = session.query(RepeatOffender).filter(RepeatOffender.plate_number != 'UNKNOWN').order_by(RepeatOffender.violations_count.desc()).limit(3).all()
             if rows:
-                list_str = ", ".join([f"**{r[0]}** ({r[1]} times)" for r in rows])
+                list_str = ", ".join([f"**{r.plate_number}** ({r.violations_count} times)" for r in rows])
                 response_text = f"Top repeat offenders detected: {list_str}."
             else:
                 response_text = "No repeat offenders currently identified with multiple violations."
@@ -1218,13 +1414,11 @@ def ai_assistant():
                 "- *'Show repeat offenders.'*"
             )
             
-        conn.close()
+        session.close()
         return jsonify({"response": response_text})
     except Exception as e:
         logger.error(f"Error in AI assistant query processing: {e}")
         return jsonify({"response": f"Error running query helper: {str(e)}"})
-
-from datetime import timedelta
 
 if __name__ == '__main__':
     # Initialize port and host for developer binding, disable reloader to avoid conflict when writing evidence files

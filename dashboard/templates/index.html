@@ -231,6 +231,14 @@
                             <div style="text-align: center; color: var(--text-muted); padding: 20px;">Computing violation forecasts...</div>
                         </div>
                     </div>
+
+                    <!-- AI Performance Metrics Panel (Phase 3) -->
+                    <div class="chart-card glass" style="padding: 1.5rem; display: flex; flex-direction: column;">
+                        <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">🤖 AI Performance Metrics</h3>
+                        <div id="ai-performance-container" style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px;">Loading AI performance stats...</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Deployed Officers Active Board -->
@@ -544,7 +552,20 @@
 
                 <!-- Video Library Section (Feature 1) -->
                 <div class="glass safety-section-card">
-                    <h3 style="margin-bottom: 15px; font-size: 1.25rem;">🎬 Safety Video Library</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                        <h3 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #fff;">🎬 Safety Video Library</h3>
+                        <div class="search-box" style="position: relative; max-width: 320px; width: 100%;">
+                            <input type="text" id="safety-search-input" placeholder="Search safety videos or rules..." style="width: 100%; padding: 10px 16px; background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); border-radius: 8px; color: #fff; font-family: Outfit, sans-serif; font-size: 0.88rem; outline: none; transition: border-color 0.3s;" onfocus="this.style.borderColor='var(--accent-cyan)'" onblur="this.style.borderColor='var(--border-color)'">
+                        </div>
+                    </div>
+                    
+                    <!-- Recently Watched Container -->
+                    <div id="safety-recents-container" style="display: none; margin-bottom: 25px;">
+                        <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--accent-cyan); margin-bottom: 12px;">🕒 Recently Watched</h4>
+                        <div class="video-grid" id="video-recents-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
 
                     <!-- Category Filters -->
                     <div class="category-filters">
@@ -573,7 +594,61 @@
                         <!-- Generated dynamically by app.js -->
                     </div>
                 </div>
-
+    
+                <!-- Police & City Safety Analytics (Advanced Insights) -->
+                <div class="glass safety-section-card" id="police-safety-analytics" style="margin-bottom: 2rem;">
+                    <h3 style="margin-bottom: 20px; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--accent-cyan);">📊</span> Police & City Safety Analytics
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <!-- Left side: Awareness vs. Violation Reduction trends Chart -->
+                        <div class="glass" style="padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                            <h4 style="font-size: 1rem; color: #fff; margin-bottom: 12px; font-weight: 600;">📈 Education vs. Violation Reduction Correlation</h4>
+                            <div style="position: relative; height: 250px; width: 100%;">
+                                <canvas id="safetyCorrelationChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- Right side: Most Watched topics & metrics tables -->
+                        <div class="glass" style="padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                            <h4 style="font-size: 1rem; color: #fff; margin-bottom: 12px; font-weight: 600;">🏆 Top Safety Awareness Topics</h4>
+                            <div class="table-container" style="max-height: 220px; overflow-y: auto;">
+                                <table class="data-table" style="font-size: 0.82rem;">
+                                    <thead>
+                                        <tr>
+                                            <th>Topic / Category</th>
+                                            <th>Total Views</th>
+                                            <th>Completion Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="safety-topics-table-body">
+                                        <!-- Dynamically populated -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Ward Wise Awareness Stats -->
+                    <div class="glass" style="padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <h4 style="font-size: 1rem; color: #fff; margin-bottom: 12px; font-weight: 600;">📍 Ward Wise Education vs. Violation Reduction Matrix</h4>
+                        <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+                            <table class="data-table" style="font-size: 0.82rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Junction / Ward</th>
+                                        <th>Violations Count</th>
+                                        <th>Safety Awareness Rate</th>
+                                        <th>Violation Reduction Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="safety-wards-table-body">
+                                    <!-- Dynamically populated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+    
                 <!-- Road Safety Quiz (Feature 6) -->
                 <div class="glass safety-section-card">
                     <div class="quiz-layout">
@@ -721,6 +796,30 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dedicated Video Player Modal (Feature 2) -->
+    <div id="video-player-modal" class="modal">
+        <div class="modal-card glass" style="max-width: 800px; padding: 20px;">
+            <span class="close-modal" id="close-video-modal" style="position: absolute; right: 20px; top: 15px; font-size: 1.8rem; cursor: pointer; color: var(--text-secondary);">&times;</span>
+            <div class="modal-header" style="margin-bottom: 15px;">
+                <h2 id="video-modal-title" style="font-size: 1.4rem; font-weight: 700; color: #fff;">--</h2>
+                <span id="video-modal-category" class="badge" style="background: var(--accent-cyan); color: #020617; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; margin-top: 5px; display: inline-block;">--</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="video-wrapper" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; border: 1px solid var(--border-color); background: #000; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+                    <!-- Embedded YouTube Player -->
+                    <div id="youtube-player-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+                </div>
+                <div class="video-details" style="color: #fff; margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <span style="color: var(--accent-cyan); font-weight: 600;" id="video-modal-duration">Duration: --</span>
+                        <span style="color: var(--text-muted);" id="video-modal-meta">BTP Official Safety Campaign</span>
+                    </div>
+                    <p id="video-modal-description" style="color: var(--text-secondary); line-height: 1.6; font-size: 0.92rem; margin: 0;">--</p>
                 </div>
             </div>
         </div>

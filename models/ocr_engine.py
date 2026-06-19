@@ -1108,11 +1108,11 @@ class OcrEngine:
 
     def _is_valid_plate(self, text):
         clean = self._clean_plate_text(text)
-        if len(clean) < 8 or len(clean) > 11:
+        if len(clean) < 7 or len(clean) > 11:
             return False
         if clean[:2] not in self.STATE_CODES:
             return False
-        match = re.match(r"^([A-Z]{2})([0-9]{1,2})([A-Z]{1,3})([0-9]{3,4})$", clean)
+        match = re.match(r"^([A-Z]{2})([0-9]{1,2})([A-Z]{0,3})([0-9]{1,4})$", clean)
         if not match:
             return False
         district = int(match.group(2))

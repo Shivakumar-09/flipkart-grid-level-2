@@ -1,9 +1,58 @@
-{
-  "HELMET_VIOLATION": "https://www.youtube.com/embed/P23dMAd92B4",
-  "TRIPLE_RIDING": "https://www.youtube.com/embed/Rk0g1n3gA8c",
-  "WRONG_SIDE_DRIVING": "https://www.youtube.com/embed/82R0H2n4hGo",
-  "ILLEGAL_PARKING": "https://www.youtube.com/embed/yQ5u9Dq7P7k",
-  "SEATBELT_VIOLATION": "https://www.youtube.com/embed/e5dO3Srs3u4",
-  "TRAFFIC_SIGNAL_RULE": "https://www.youtube.com/embed/P23dMAd92B4",
-  "EMERGENCY_VEHICLE": "https://www.youtube.com/embed/P23dMAd92B4"
-}
+[
+  {
+    "title": "Why Helmets Save Lives",
+    "youtube_id": "RWhMEkMtLy0",
+    "thumbnail": "https://img.youtube.com/vi/RWhMEkMtLy0/hqdefault.jpg",
+    "duration": "3:15",
+    "description": "An official Ministry of Road Transport campaign highlighting the physics of helmet protection and head injury prevention during impacts.",
+    "category": "Helmet Safety"
+  },
+  {
+    "title": "Dangers of Triple Riding",
+    "youtube_id": "GJSEZx0tMlw",
+    "thumbnail": "https://img.youtube.com/vi/GJSEZx0tMlw/hqdefault.jpg",
+    "duration": "2:45",
+    "description": "Government awareness campaign showing how overloaded two-wheelers compromise suspension, center of gravity, and double braking distance.",
+    "category": "Triple Riding Risks"
+  },
+  {
+    "title": "Obeying the Traffic Lights",
+    "youtube_id": "zDNYSZ1vfpc",
+    "thumbnail": "https://img.youtube.com/vi/zDNYSZ1vfpc/hqdefault.jpg",
+    "duration": "2:10",
+    "description": "An interactive tutorial explaining stopping rules, pedestrian crossing rights, and signal timing etiquette under the Motor Vehicles Act.",
+    "category": "Traffic Signal Rules"
+  },
+  {
+    "title": "Seatbelt Awareness Guide",
+    "youtube_id": "Zj-_EEQQw9M",
+    "thumbnail": "https://img.youtube.com/vi/Zj-_EEQQw9M/hqdefault.jpg",
+    "duration": "3:05",
+    "description": "Ministry of Road Transport safety briefing on how three-point seatbelts prevent occupant cabin ejection and distribute decelerating forces.",
+    "category": "Seatbelt Awareness"
+  },
+  {
+    "title": "Wrong Side Driving Consequences",
+    "youtube_id": "tgxAMRBcQwk",
+    "thumbnail": "https://img.youtube.com/vi/tgxAMRBcQwk/hqdefault.jpg",
+    "duration": "3:30",
+    "description": "BTP advisory warning against dangerous wrong side driving, lane violation, and head-on junction hazards.",
+    "category": "Wrong Side Driving"
+  },
+  {
+    "title": "Smart Municipal Parking Etiquettes",
+    "youtube_id": "bbcSVu-kr2o",
+    "thumbnail": "https://img.youtube.com/vi/bbcSVu-kr2o/hqdefault.jpg",
+    "duration": "1:55",
+    "description": "A guide to understanding yellow curbs, towing policies, and how obstructing lanes disrupts peak transit flows.",
+    "category": "Illegal Parking"
+  },
+  {
+    "title": "Yielding to Emergency Vehicles",
+    "youtube_id": "xrDilEoPlNw",
+    "thumbnail": "https://img.youtube.com/vi/xrDilEoPlNw/hqdefault.jpg",
+    "duration": "2:20",
+    "description": "WHO global road safety campaign outlining the legal obligation and technique to safely yield the right of way to active sirens.",
+    "category": "Emergency Vehicles"
+  }
+]
