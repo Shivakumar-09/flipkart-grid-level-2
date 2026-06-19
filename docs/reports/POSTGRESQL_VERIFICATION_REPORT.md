@@ -1,13 +1,13 @@
 # PostgreSQL Verification Report
 
-Generated at: 2026-06-19 10:14:37
+Generated at: 2026-06-19 10:57:57
 
 ## Connection Health
 - **Status**: CONNECTED
 - **Host**: `dpg-d8pqqdrtqb8s738f980g-a.singapore-postgres.render.com`
 - **Port**: `None`
 - **Database**: `vehicles_dp0p`
-- **Connection Latency**: `6086.78 ms`
+- **Connection Latency**: `5370.51 ms`
 
 ## Record Counts
 | Table Name | Record Count |
@@ -27,17 +27,17 @@ Generated at: 2026-06-19 10:14:37
 ## CRUD Operations Latency
 | Operation | Target Table | Latency | Status |
 |---|---|---|---|
-| INSERT | `vehicles` | `745.23 ms` | SUCCESS |
-| UPDATE | `vehicles` | `1511.96 ms` | SUCCESS |
-| SEARCH | `vehicles` | `1357.46 ms` | SUCCESS |
+| INSERT | `vehicles` | `593.19 ms` | SUCCESS |
+| UPDATE | `vehicles` | `1524.74 ms` | SUCCESS |
+| SEARCH | `vehicles` | `981.43 ms` | SUCCESS |
 
 ## Dashboard Queries Latency
 | Query Type | Description | Latency |
 |---|---|---|
-| Hotspots Aggregation | Group violations by camera | `1045.83 ms` |
-| Repeat Offenders List | Fetch top 5 repeat offenders | `341.58 ms` |
-| Hourly Trends | Group violations by hour | `421.43 ms` |
-| Daily Trends | Group violations by day (last 7 days) | `312.09 ms` |
+| Hotspots Aggregation | Group violations by camera | `1073.30 ms` |
+| Repeat Offenders List | Fetch top 5 repeat offenders | `302.44 ms` |
+| Hourly Trends | Group violations by hour | `291.76 ms` |
+| Daily Trends | Group violations by day (last 7 days) | `311.44 ms` |
 
 ## Index Usage Verification
 The database utilizes the following indices mapped in SQLAlchemy:

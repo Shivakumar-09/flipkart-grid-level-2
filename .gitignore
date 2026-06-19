@@ -1,6 +1,6 @@
 # ============================================================
 # TrafficFlow — AI-Powered Smart Traffic Intelligence Platform
-# .gitignore  |  Team Vardhamans  |  Flipkart Grid Hackathon
+# .gitignore  |  Flipkart Grid Hackathon
 # ============================================================
 
 # ── Python ──────────────────────────────────────────────────
@@ -25,6 +25,7 @@ env/
 ENV/
 .env
 .env.local
+.env.*
 
 # ── Database (auto-generated at runtime) ─────────────────────
 database/trafficflow.db
@@ -40,14 +41,14 @@ ocr_debug/
 uploads/
 debug_images/
 
-# ── AI Model Weights (large binary files, download separately)─
+# ── AI Model Weights (large binary files — download separately)
 *.pt
 *.pth
 *.onnx
 *.weights
 *.h5
 
-# ── Temporary / Debug Images ─────────────────────────────────
+# ── Temporary / Debug Images (generated at runtime) ──────────
 enhanced_plate.jpg
 ocr_result.jpg
 original_image.jpg
@@ -55,6 +56,11 @@ plate_crop.jpg
 vehicle_crop.jpg
 *.tmp.jpg
 *.tmp.png
+
+# ── Scratch / Throwaway Scripts ───────────────────────────────
+scratch_*.py
+test_*fix*.py
+test_*debug*.py
 
 # ── OS & IDE ─────────────────────────────────────────────────
 .DS_Store

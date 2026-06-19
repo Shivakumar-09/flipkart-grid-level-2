@@ -1,6 +1,6 @@
 # TrafficFlow Database Reset Audit Report
 
-- **Timestamp of Reset**: 2026-06-18 21:46:58
+- **Timestamp of Reset**: 2026-06-19 10:56:23
 - **Database Provider**: Render PostgreSQL
 - **Tables Re-initialized successfully**:
   - `vehicles`: Stores vehicle registration profiles.
@@ -10,7 +10,7 @@
   - `repeat_offenders`: Stores offenders with multiple violations.
   - `police_alerts`: Stores high congestion alerts.
   - `patrol_dispatch`: Stores patrol dispatch action plans.
-  - `payments`: Stores challan payment transaction logs.
+  - `evidence_packages`: Stores compiled evidence visual image packages.
   - `sms_logs`: Stores Twilio SMS notification alerts log.
   - `traffic_analytics`: Logs continuous traffic density metrics per camera node.
   - `safety_video_views`: Logs road safety video watch history per user.
