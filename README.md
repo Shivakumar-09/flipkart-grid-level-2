@@ -1,6 +1,6 @@
 # TrafficFlow
 
-### AI-Powered Traffic Intelligence & Automated Enforcement Platform
+### AI-Powered Traffic Intelligence, Violation Detection & Smart City Analytics Platform
 **Built for Flipkart Grid 7.0**  
 **Team Vardhamans**  
 
@@ -8,24 +8,24 @@
 
 ## 📌 Overview
 
-TrafficFlow is a city-scale intelligent traffic monitoring and enforcement platform. It leverages state-of-the-art Computer Vision and Deep Learning pipelines to automatically ingest traffic camera images, detect traffic violations, recognize vehicle registration plates under diverse environmental conditions, compile PDF challan evidence, alert law enforcement authorities, and aggregate real-time analytics across congested urban wards.
+TrafficFlow is a city-scale intelligent traffic monitoring, incident detection, and analytics platform. It leverages state-of-the-art Computer Vision and Deep Learning pipelines to automatically ingest traffic surveillance images, identify road safety violations, localize and recognize vehicle registration plates under diverse environmental conditions, generate standardized evidence packages, notify municipal enforcement teams, and compile detailed city-wide analytics.
 
 ---
 
 ## ⚠️ Problem Statement
 
-Modern cities suffer from high traffic volume, congestion, and frequent road safety violations. The primary challenges in contemporary traffic management are:
-* **Manual Monitoring**: Traffic control rooms rely on manual video stream inspections. This process is labor-intensive, exhausting, and leads to missing critical violations.
-* **Slow Enforcement**: From the time a violation occurs to issuing a fine, manual review takes days or weeks, decreasing the deterrent effect.
-* **Human Errors**: Misidentifying vehicles, plate numbers, or violation severity leads to citizen complaints and administrative disputes.
-* **Poor Scalability**: Scaling manual enforcement to hundreds of intersections is economically and operationally unfeasible.
-* **Limited Analytics**: Traffic databases lack the telemetry necessary to dynamically route police patrols, optimize lights, or identify repeat offenders.
+Modern cities suffer from massive traffic volumes and frequent road safety violations. The primary challenges facing contemporary traffic management are:
+* **Manual Surveillance**: Traffic control rooms rely on manual video stream inspections. This process is labor-intensive and leads to missing critical incidents.
+* **Slow Incident Processing**: Inspecting, validating, and archiving traffic incidents takes days or weeks, decreasing the speed of administrative actions.
+* **Human Errors**: Mismatching plate characters or vehicle categories during manual entry leads to poor data integrity.
+* **Poor Scalability**: Scaling manual review across hundreds of busy city intersections is economically and operationally unfeasible.
+* **Lack of Analytics Integration**: Traffic databases lack the telemetry necessary to dynamically route patrolling units, optimize light intervals, or identify repeat offenders.
 
 ---
 
 ## 💡 The Solution
 
-TrafficFlow automates the entire surveillance, detection, ANPR, and administrative workflow:
+TrafficFlow automates the entire surveillance, detection, ANPR, and administrative documentation pipeline:
 
 * **✓ Vehicle Detection**: Multi-class categorization of cars, motorcycles, buses, and trucks.
 * **✓ Rider Detection**: Automatic segmentation of drivers, pillion riders, and pedestrians.
@@ -36,11 +36,10 @@ TrafficFlow automates the entire surveillance, detection, ANPR, and administrati
 * **✓ License Plate Recognition**: Dedicated localization model targeting registration plates.
 * **✓ Advanced OCR Preprocessing**: Evens lighting and sharpens character boundaries using CLAHE, bilateral filtering, and Otsu binarization.
 * **✓ OCR Validation**: Checks character strings against standard Indian plate registration syntax (`STATE_CODES` and digit length bounds).
-* **✓ Evidence Generation**: Compiles professional side-by-side visual PDF challans containing raw context images, cropped vehicles, and plate close-ups.
-* **✓ Auto Challan Creation**: Syncs challan IDs and violation metadata directly to the PostgreSQL database.
-* **✓ Police Alerts**: Triggers real-time alerts and dispatches patrols to violation hotspots.
+* **✓ Automated Evidence Package Generation**: Compiles professional side-by-side visual reports containing raw context images, cropped vehicles, and plate close-ups.
+* **✓ Police Investigation Support**: Triggers real-time alerts and dispatches patrols to violation hotspots.
 * **✓ City Analytics**: Interactive analytics platform rendering hourly trends, heatmaps, and offender tables.
-* **✓ Safety Awareness Portal**: Integrated public portal featuring awareness videos, road safety quizzes, and certifiable training.
+* **✓ Citizen Violation Review Portal**: Integrated public portal allowing citizens to review safety logs, watch traffic safety videos, and complete awareness quizzes.
 
 ---
 
@@ -59,7 +58,7 @@ graph TD
     G --> H[Advanced Preprocessing Pipeline]
     H --> I[OCR Recognition: EasyOCR / PaddleOCR]
     I --> J[Indian Format Verification]
-    J --> K[Evidence PDF Builder]
+    J --> K[Evidence Package Builder]
     K --> L[PostgreSQL Persistent Sync]
     L --> M[Live Dashboard Heatmaps & Alerts]
 ```
@@ -84,19 +83,19 @@ graph TD
 [Input Plate Crop] ──> [CLAHE Contrast] ──> [Bilateral Denoising] ──> [Otsu Binarization] ──> [OCR Candidates Selection]
 ```
 
-### 3. Automated Evidence Generator
-* Generates standard PDF challans side-by-side. Layout maps:
+### 3. Automated Evidence Package Compiler
+* Generates legal evidence reports side-by-side. Layout maps:
   - **Left Area**: Full context scene displaying the vehicle, rider, and environment.
   - **Right Top Area**: License plate close-up.
   - **Right Bottom Area**: Bounding-box violation zoom (e.g. helmet missing or wrong side direction).
-* Saves challans dynamically under `challans/` linked to customer contact details.
+* Saves evidence files dynamically under `challans/` linked to customer contact details.
 
 ### 4. Smart City Analytics & Hotspots
 * Renders city analytics maps showing congested corridors (Silk Board, Whitefield, Electronic City) with color-coded heatmap circles (Red/Orange/Yellow).
 * Tracks peak congestion hours, weekday vs. weekend patterns, and breakdown by violation category.
 
-### 5. Citizen Safety Learning Hub
-* Features a citizen portal with safety awareness videos, interactive traffic quizzes, and digital certificate downloads to encourage safe driving habits.
+### 5. Safety Learning Hub & Citizen Violation Review Portal
+* Features a citizen portal with safety awareness videos, interactive traffic quizzes, and digital certificate downloads to encourage safe driving habits. Allows citizens to search and review safety logs associated with their vehicle plate numbers.
 
 ---
 
@@ -117,20 +116,15 @@ TrafficFlow is integrated with a centralized, indexed PostgreSQL cloud database 
               1 /   1 /    │ 1    \ 1
                /     /     │       \
   ┌───────────┴┐ ┌──┴─────┐│┌───────┴──┐┌───────────────┐
-  │ocr_results │ │challans│││sms_logs  ││ police_alerts │
+  │ocr_results │ │evidence│││sms_logs  ││ police_alerts │
+  │            │ │packages│││          ││               │
   └────────────┘ └────────┘│└──────────┘└───────────────┘
-                           │ 1
-                           │
-                           │ *
-                  ┌────────┴────────┐
-                  │    payments     │
-                  └─────────────────┘
 ```
 
 ### Core Schema Tables:
 1. **`vehicles`**: Tracks license plate number, owner name, phone number, and association to violations.
 2. **`violations`**: Holds coordinates, timestamp, camera node, type, confidence, and links to visual evidence crops.
-3. **`challans`**: Links to violations with generated challan ID, transaction status (`PENDING` / `PAID`), and fine amount.
+3. **`evidence_packages`**: Stores generated evidence ID, associated violation ID, image paths, OCR results, and generated timestamp.
 4. **`ocr_results`**: Stores raw crop paths, preprocessed contrast images, confidence levels, and the OCR engine type used.
 5. **`repeat_offenders`**: Automatically updates violation counts per vehicle plate, setting blacklisting warnings.
 6. **`police_alerts`**: Log entries of dispatches triggered for high-density or repeat violations.
@@ -178,7 +172,7 @@ Create a `.env` file in the root `TrafficFlow` directory:
 ```env
 DATABASE_URL=postgresql://your_user:your_password@your_host:5432/your_db
 PUBLIC_BASE_URL=http://localhost:5000
-CHALLAN_PAYMENT_URL=http://localhost:5000/challan
+EVIDENCE_PORTAL_URL=http://localhost:5000/challan
 DEFAULT_CUSTOMER_PHONE=+919876543210
 ```
 
