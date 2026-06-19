@@ -19,8 +19,8 @@ load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 # Database configuration URL
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
-    logger.warning("DATABASE_URL environment variable is not set. Defaulting to local Singapore-postgres tunnel.")
-    DATABASE_URL = "postgresql://vehicles_dp0p_user:ZfLYituZKu0Fr8vAwuuZNK3RryxeUocE@dpg-d8pqqdrtqb8s738f980g-a.singapore-postgres.render.com/vehicles_dp0p"
+    logger.warning("DATABASE_URL environment variable is not set. Defaulting to local PostgreSQL default.")
+    DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/trafficflow"
 
 # Database Engine initialization with pooling and reconnect logic
 engine = None
