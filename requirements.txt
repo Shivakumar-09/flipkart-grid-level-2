@@ -1,6 +1,6 @@
 ultralytics>=8.1.0
 easyocr>=1.7.1
-opencv-python>=4.8.0
+opencv-python-headless>=4.8.0
 flask>=3.0.0
 flask-compress>=1.14.0
 numpy>=1.24.0
@@ -8,3 +8,9 @@ pandas>=2.0.0
 gdown>=5.0.0
 pydantic>=2.0.0
 matplotlib>=3.7.0
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
+gunicorn>=21.2.0
+pytesseract>=0.3.10
+Pillow>=10.0.0

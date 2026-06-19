@@ -1,0 +1,53 @@
+# =============================================================
+# TrafficFlow — Render Deployment Configuration
+# =============================================================
+# Deploy at: https://dashboard.render.com → New Web Service
+# Connect: GitHub repo → Shivakumar-09/flipkart-grid-level-2
+# =============================================================
+
+services:
+  - type: web
+    name: trafficflow
+    runtime: python
+    region: singapore          # Closest to India; matches your Postgres region
+    plan: standard             # Standard plan required for AI workloads (512MB RAM min)
+    
+    # Build
+    buildCommand: "chmod +x build.sh && ./build.sh"
+    
+    # Start (gunicorn production server)
+    startCommand: "gunicorn app:app --workers=1 --threads=2 --timeout=120 --bind 0.0.0.0:$PORT --log-level info"
+    
+    # Health check
+    healthCheckPath: /api/health
+    
+    # Environment variables (non-secret ones only — add secrets in Render dashboard)
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: PUBLIC_BASE_URL
+        fromService:
+          type: web
+          name: trafficflow
+          property: host
+      - key: CHALLAN_PAYMENT_URL
+        fromService:
+          type: web
+          name: trafficflow
+          property: host
+      - key: TRAFFICFLOW_OCR_DEBUG
+        value: "0"              # Disable debug OCR image saving on production
+      - key: DEFAULT_CUSTOMER_PHONE
+        value: "+919876543210"
+      - key: TRAFFICFLOW_MAX_INFERENCE_WIDTH
+        value: "640"            # Reduce inference width to save memory on Render
+      # DATABASE_URL → Set this manually in Render Dashboard → Environment
+      # Use the Internal URL from your Render PostgreSQL instance
+
+  # Optional: PostgreSQL database (if not already created)
+  # Comment out if you already have dpg-d8pqqdrtqb8s738f980g-a
+  # - type: pserv
+  #   name: trafficflow-db
+  #   plan: free
+  #   databaseName: vehicles_dp0p
+  #   databaseUser: vehicles_dp0p_user

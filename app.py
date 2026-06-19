@@ -1687,9 +1687,13 @@ def start_cache_warming_thread(app_instance):
     t = threading.Thread(target=run_warming, daemon=True)
     t.start()
 
+# Start cache warming thread at module level so gunicorn workers pick it up
+# (not just when running via `python app.py`)
+_is_production = os.environ.get("RENDER") or os.environ.get("FLASK_ENV") == "production"
+start_cache_warming_thread(app)
+
 if __name__ == '__main__':
-    # Start cache warming thread
-    start_cache_warming_thread(app)
-    # Initialize port and host for developer binding, disable reloader to avoid conflict when writing evidence files
+    # Local development server
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    debug_mode = not _is_production
+    app.run(host='0.0.0.0', port=port, debug=debug_mode, use_reloader=False)
