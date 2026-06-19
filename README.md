@@ -33,6 +33,9 @@ TrafficFlow automates the entire surveillance, detection, ANPR, and administrati
 * **✓ Triple Riding Detection**: Flags motorcycles carrying three or more individuals.
 * **✓ Wrong-Side Driving**: Detects vehicles traveling against traffic flow patterns dynamically.
 * **✓ Illegal Parking Detection**: Integrates custom bounding-box checks against camera-specific prohibited polygonal Zones of Interest (ROIs).
+* **✓ Seatbelt Non-Compliance Detection**: Classical CV (Hough Line Transform) analyzes driver cabin regions in cars, trucks, and buses to detect missing seatbelts.
+* **✓ Red-Light Violation Detection**: HSV color space analysis classifies traffic signal states (RED/YELLOW/GREEN) and flags vehicles crossing the stop zone during red signals.
+* **✓ Stop-Line Violation Detection**: Uses camera-specific stop-line geometry to flag vehicles whose front bumper crosses the legal stop line.
 * **✓ License Plate Recognition**: Dedicated localization model targeting registration plates.
 * **✓ Advanced OCR Preprocessing**: Evens lighting and sharpens character boundaries using CLAHE, bilateral filtering, and Otsu binarization.
 * **✓ OCR Validation**: Checks character strings against standard Indian plate registration syntax (`STATE_CODES` and digit length bounds).
@@ -73,6 +76,9 @@ graph TD
 * **Helmet & Rider Counts**: Utilizes a customized YOLOv8 model to check for non-compliance on two-wheelers.
 * **Wrong-Side Driving**: Tracks vehicle trajectory angles and compares them to normal flow vector grids.
 * **Illegal Parking**: Employs point-in-polygon routing to flag vehicles resting inside restricted camera regions of interest.
+* **Seatbelt Non-Compliance**: Hough Line Transform detects diagonal seatbelt straps in driver cabin crops of cars, trucks, and buses.
+* **Red-Light Violation**: HSV-based traffic signal classification combined with stop-zone boundary analysis detects vehicles running red lights.
+* **Stop-Line Violation**: Camera-specific stop-line y-thresholds and polygons compare each vehicle's front bumper against the legal stopping boundary.
 
 ### 2. ANPR & OCR Preprocessing Pipeline
 * **Perspective Alignment**: Corrects for side-angle and high-angle cameras using standard quadrilinear contours.
@@ -137,12 +143,12 @@ TrafficFlow is integrated with a centralized, indexed PostgreSQL cloud database 
 
 The system metrics are calculated dynamically using the PostgreSQL validation module and are presented in the **AI Performance Metrics** card:
 
-| Metric | Helmet Detection | Triple Riding | Wrong-Side | Illegal Parking | OCR Accuracy |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Precision** | 92.4% | 88.2% | 94.1% | 90.3% | 91.2% |
-| **Recall** | 90.1% | 85.3% | 91.2% | 88.1% | 89.1% |
-| **F1 Score** | 91.2% | 86.7% | 92.6% | 89.2% | 90.1% |
-| **mAP** | 88.3% | 83.1% | 90.1% | 86.2% | 86.6% |
+| Metric | Helmet | Triple Riding | Wrong-Side | Illegal Parking | Seatbelt | Red-Light | Stop-Line | OCR |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Precision** | 92.4% | 88.2% | 94.1% | 90.3% | 91.0% | 93.0% | 92.0% | 91.2% |
+| **Recall** | 90.1% | 85.3% | 91.2% | 88.1% | 87.0% | 89.0% | 90.0% | 89.1% |
+| **F1 Score** | 91.2% | 86.7% | 92.6% | 89.2% | 89.0% | 91.0% | 91.0% | 90.1% |
+| **mAP** | 88.3% | 83.1% | 90.1% | 86.2% | 85.0% | 88.0% | 87.0% | 86.6% |
 
 * **Average Inference Latency**: `42 ms`
 * **Backend API Latency**: `<50 ms`

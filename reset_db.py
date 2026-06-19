@@ -35,7 +35,7 @@ def reset_database():
         f.write("  - `repeat_offenders`: Stores offenders with multiple violations.\n")
         f.write("  - `police_alerts`: Stores high congestion alerts.\n")
         f.write("  - `patrol_dispatch`: Stores patrol dispatch action plans.\n")
-        f.write("  - `payments`: Stores challan payment transaction logs.\n")
+        f.write("  - `evidence_packages`: Stores compiled evidence visual image packages.\n")
         f.write("  - `sms_logs`: Stores Twilio SMS notification alerts log.\n")
         f.write("  - `traffic_analytics`: Logs continuous traffic density metrics per camera node.\n")
         f.write("  - `safety_video_views`: Logs road safety video watch history per user.\n")

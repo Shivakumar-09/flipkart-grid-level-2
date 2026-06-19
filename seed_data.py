@@ -10,7 +10,7 @@ from database.postgres import (
     Base, engine, SessionLocal, initialize_database,
     Vehicle, Violation, Challan, OCRResult, RepeatOffender,
     PoliceAlert, SMSLog, Analytics, SafetyVideoView, CameraNode,
-    Payment, PatrolDispatch
+    Payment, PatrolDispatch, EvidencePackage
 )
 from engine.evidence_engine import EvidenceEngine
 
@@ -136,7 +136,15 @@ def seed():
             "CAM_BLR_010": 12   # Yelahanka - Green
         }
         
-        violation_types = ["HELMET_VIOLATION", "TRIPLE_RIDING", "WRONG_SIDE_DRIVING", "ILLEGAL_PARKING", "SEATBELT_VIOLATION"]
+        violation_types = [
+            "HELMET_VIOLATION",
+            "TRIPLE_RIDING",
+            "WRONG_SIDE_DRIVING",
+            "ILLEGAL_PARKING",
+            "SEATBELT_VIOLATION",
+            "RED_LIGHT_VIOLATION",
+            "STOP_LINE_VIOLATION"
+        ]
         
         # Pre-defined plates (some repeat offenders, some unique)
         repeat_plates = {
@@ -230,6 +238,10 @@ def seed():
                 shutil.copy(fallback_img, os.path.join(package_dir, "original.jpg"))
                 shutil.copy(fallback_img, os.path.join(package_dir, "annotated_full.jpg"))
                 shutil.copy(fallback_img, os.path.join(package_dir, "original_full.jpg"))
+                if v_type == "SEATBELT_VIOLATION":
+                    shutil.copy(fallback_img, os.path.join(package_dir, "seatbelt_evidence.jpg"))
+                if v_type == "STOP_LINE_VIOLATION":
+                    shutil.copy(fallback_img, os.path.join(package_dir, "stopline_evidence.jpg"))
                 
                 # Create plate placeholder
                 mock_plate = np.zeros((40, 120, 3), dtype=np.uint8)
@@ -300,6 +312,25 @@ def seed():
                     plate_crop_path=f"{rel_evidence_path}/plate_crop.jpg"
                 )
                 session.add(ocr_res)
+                
+                evidence_pkg = EvidencePackage(
+                    evidence_id=str(uuid.uuid4()),
+                    violation_id=v_id,
+                    image_paths=json.dumps({
+                        "plate_crop": f"{rel_evidence_path}/plate_crop.jpg",
+                        "original_full": f"{rel_evidence_path}/original_full.jpg",
+                        "annotated_full": f"{rel_evidence_path}/annotated_full.jpg",
+                        "seatbelt_evidence": f"{rel_evidence_path}/seatbelt_evidence.jpg" if v_type == "SEATBELT_VIOLATION" else "",
+                        "stopline_evidence": f"{rel_evidence_path}/stopline_evidence.jpg" if v_type == "STOP_LINE_VIOLATION" else ""
+                    }),
+                    ocr_results=json.dumps({
+                        "plate_number": plate,
+                        "ocr_confidence": conf,
+                        "ocr_engine": "tesseract"
+                    }),
+                    generated_timestamp=ts_datetime
+                )
+                session.add(evidence_pkg)
                 
                 challan_index += 1
                 total_violations_inserted += 1

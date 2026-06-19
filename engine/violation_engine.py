@@ -2,11 +2,17 @@ import cv2
 import time
 import logging
 import numpy as np
+import os
 from models.vehicle_detector import VehicleDetector
 from models.helmet_detector import HelmetDetector
 from models.triple_riding_detector import TripleRidingDetector
 from models.parking_detector import ParkingDetector
 from models.ocr_engine import OcrEngine
+from models.seatbelt_detector import SeatbeltDetector
+from models.traffic_light_detector import TrafficLightDetector
+from datetime import datetime
+import uuid
+from utils.runtime import empty_stage_profile, add_ms, get_resource_snapshot
 
 logger = logging.getLogger("ViolationEngine")
 
@@ -18,9 +24,11 @@ class ViolationEngine:
         self.triple_riding_detector = TripleRidingDetector()
         self.parking_detector = ParkingDetector()
         self.ocr_engine = OcrEngine()
+        self.seatbelt_detector = SeatbeltDetector()
+        self.traffic_light_detector = TrafficLightDetector()
+        self.max_inference_width = int(os.environ.get("TRAFFICFLOW_MAX_INFERENCE_WIDTH", "1280"))
         
         import json
-        import os
         self.camera_locations = {}
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +39,50 @@ class ViolationEngine:
             logger.error(f"Failed to load camera_locations.json in ViolationEngine: {e}")
             
         logger.info("All detection modules loaded successfully.")
+
+    def _resize_for_inference(self, image):
+        h, w = image.shape[:2]
+        if w <= self.max_inference_width:
+            return image, 1.0
+        scale = self.max_inference_width / float(w)
+        resized = cv2.resize(
+            image,
+            (self.max_inference_width, int(round(h * scale))),
+            interpolation=cv2.INTER_AREA
+        )
+        return resized, scale
+
+    def _ocr_metadata(self, image, vehicle_box, ocr_cache, profile):
+        key = tuple(int(v) for v in vehicle_box)
+        if key not in ocr_cache:
+            debug_id = str(uuid.uuid4())
+            p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, vehicle_box, debug_name=debug_id)
+            ocr_profile = (ocr_debug or {}).get("profile", {})
+            profile["plate_detection_ms"] = round(
+                profile.get("plate_detection_ms", 0.0) + float(ocr_profile.get("plate_detection_ms", 0.0)),
+                2
+            )
+            profile["ocr_ms"] = round(
+                profile.get("ocr_ms", 0.0) + float(ocr_profile.get("ocr_recognition_ms", 0.0)),
+                2
+            )
+
+            ocr_cache[key] = {
+                "plate_number": p_num,
+                "ocr_confidence": o_conf,
+                "ocr_debug": ocr_debug or {},
+                "metadata": {
+                    "plate_number": p_num if o_conf >= 0.50 else "UNKNOWN",
+                    "ocr_confidence": o_conf,
+                    "ocr_engine": (ocr_debug or {}).get("ocr_engine", "none"),
+                    "ocr_debug_paths": (ocr_debug or {}).get("debug_paths", {}),
+                    "plate_crop_path": ((ocr_debug or {}).get("debug_paths", {}) or {}).get("plate_crop", ""),
+                    "enhanced_plate_path": ((ocr_debug or {}).get("debug_paths", {}) or {}).get("enhanced_plate", ""),
+                    "ocr_result_path": ((ocr_debug or {}).get("debug_paths", {}) or {}).get("ocr_result", ""),
+                    "ocr_attempts": (ocr_debug or {}).get("ocr_attempts", [])
+                }
+            }
+        return ocr_cache[key]
 
     def associate_riders_to_motorcycle(self, persons, mc_box):
         """
@@ -77,7 +129,17 @@ class ViolationEngine:
             dist_score = max(0.0, 1.0 - norm_dist)
             
             score = iou + center_inside + dist_score
-            logger.info(f"Rider Association Score: {score:.3f} (IoU: {iou:.3f}, Inside: {center_inside}, DistScore: {dist_score:.3f})")
+            p["association"] = {
+                "iou": round(float(iou), 4),
+                "center_inside": bool(center_inside),
+                "center_distance_px": round(float(dist), 2),
+                "center_distance_norm": round(float(norm_dist), 4),
+                "association_score": round(float(score), 4),
+            }
+            logger.info(
+                "Rider Association Score: %.3f (IoU: %.3f, Inside: %s, Dist: %.1fpx, DistScore: %.3f)",
+                score, iou, center_inside, dist, dist_score
+            )
             
             if score >= 0.8:
                 associated.append(p)
@@ -97,24 +159,50 @@ class ViolationEngine:
             camera_id = "CAM_BLR_001"
         location = self.camera_locations[camera_id]
 
-        start_time = time.time()
+        start_time = time.perf_counter()
+        profile = empty_stage_profile()
         
         # Load image
+        stage_started = time.perf_counter()
         image = cv2.imread(image_path)
         if image is None:
             raise ValueError(f"Could not load image at {image_path}")
+        add_ms(profile, "image_load_ms", stage_started)
+
+        original_h, original_w = image.shape[:2]
+        stage_started = time.perf_counter()
+        image, resize_scale = self._resize_for_inference(image)
+        add_ms(profile, "image_resize_ms", stage_started)
+        profile["input_width"] = int(original_w)
+        profile["input_height"] = int(original_h)
+        profile["inference_width"] = int(image.shape[1])
+        profile["inference_height"] = int(image.shape[0])
+        profile["resize_scale"] = round(float(resize_scale), 4)
             
         h, w, _ = image.shape
         
         # 1. Image Quality Enhancement
+        stage_started = time.perf_counter()
         enhanced_image = self._enhance_image(image)
+        add_ms(profile, "preprocess_ms", stage_started)
         
         # 2. Vehicle Detection
+        stage_started = time.perf_counter()
         detections = self.vehicle_detector.detect(enhanced_image)
+        add_ms(profile, "vehicle_detection_ms", stage_started)
         logger.info(f"Detected {len(detections)} objects in the frame.")
         
         violations = []
+        helmet_debug = []
         annotated_image = image.copy()
+        ocr_cache = {}
+        helmet_debug_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "outputs",
+            "debug",
+            "helmet",
+        )
+        os.makedirs(helmet_debug_dir, exist_ok=True)
         
         # 3. Extract motorcycles and persons
         motorcycles = [d for d in detections if d['label'] == 'motorcycle']
@@ -148,7 +236,8 @@ class ViolationEngine:
             mc_box = mc['box']
             
             # Extract Plate OCR for this motorcycle
-            p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, mc_box)
+            debug_id = str(uuid.uuid4())
+            p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, mc_box, debug_name=debug_id)
             if plate_num == "UNKNOWN" or o_conf > ocr_conf:
                 plate_num = p_num
                 ocr_conf = o_conf
@@ -161,7 +250,8 @@ class ViolationEngine:
                 "ocr_debug_paths": ocr_debug.get("debug_paths", {}) if ocr_debug else {},
                 "plate_crop_path": (ocr_debug.get("debug_paths", {}) or {}).get("plate_crop", ""),
                 "enhanced_plate_path": (ocr_debug.get("debug_paths", {}) or {}).get("enhanced_plate", ""),
-                "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", "")
+                "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", ""),
+                "ocr_attempts": ocr_debug.get("ocr_attempts", []) if ocr_debug else []
             }
                 
             # Associate persons to this bike using score-based algorithm (Task 2)
@@ -200,26 +290,95 @@ class ViolationEngine:
             # Check helmet for each associated rider (Task 4)
             for r_idx, rider in enumerate(associated_persons):
                 r_box = rider['box']
-                has_helmet, helmet_conf = self.helmet_detector.check_helmet(enhanced_image, r_box)
-                
-                if not has_helmet:
+                helmet_result = self.helmet_detector.check_helmet(
+                    enhanced_image,
+                    r_box,
+                    rider_id=r_idx,
+                    debug_dir=helmet_debug_dir,
+                )
+                helmet_result["association"] = rider.get("association", {})
+                helmet_debug.append(helmet_result)
+
+                head_bbox = helmet_result.get("head_bbox") or r_box
+                helmet_bbox = helmet_result.get("helmet_bbox")
+
+                if helmet_result["decision"] == "HELMET_VIOLATION":
                     violations.append({
                         "type": "HELMET_VIOLATION",
                         "box": r_box,
-                        "confidence": helmet_conf,
-                        "details": f"Rider #{r_idx+1} without helmet",
+                        "confidence": helmet_result["helmet_missing_confidence"],
+                        "details": (
+                            f"Rider #{r_idx + 1} without helmet "
+                            f"(missing_conf={helmet_result['helmet_missing_confidence']:.2f}, "
+                            f"reason={helmet_result['violation_trigger_reason']})"
+                        ),
+                        "helmet_debug": helmet_result,
                         **ocr_metadata
                     })
-                    # Draw Red Box around head / body of rider
-                    cv2.rectangle(annotated_image, (r_box[0], r_box[1]), (r_box[2], r_box[3]), (0, 0, 255), 3) # Red
-                    cv2.putText(annotated_image, f"NO HELMET: Rider #{r_idx+1}", 
-                                (r_box[0], r_box[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                    cv2.rectangle(annotated_image, (r_box[0], r_box[1]), (r_box[2], r_box[3]), (0, 0, 255), 3)
+                    cv2.rectangle(
+                        annotated_image,
+                        (head_bbox[0], head_bbox[1]),
+                        (head_bbox[2], head_bbox[3]),
+                        (0, 0, 255),
+                        2,
+                    )
+                    cv2.putText(
+                        annotated_image,
+                        f"NO HELMET: Rider #{r_idx + 1} ({helmet_result['helmet_missing_confidence']:.0%})",
+                        (r_box[0], r_box[1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        (0, 0, 255),
+                        2,
+                    )
+                elif helmet_result["decision"] == "REVIEW_REQUIRED":
+                    violations.append({
+                        "type": "REVIEW_REQUIRED",
+                        "subtype": "HELMET_UNCERTAIN",
+                        "box": r_box,
+                        "confidence": helmet_result["helmet_missing_confidence"],
+                        "details": (
+                            f"Rider #{r_idx + 1} helmet status uncertain "
+                            f"(reason={helmet_result['violation_trigger_reason']})"
+                        ),
+                        "helmet_debug": helmet_result,
+                        **ocr_metadata
+                    })
+                    cv2.rectangle(annotated_image, (r_box[0], r_box[1]), (r_box[2], r_box[3]), (0, 165, 255), 2)
+                    cv2.putText(
+                        annotated_image,
+                        f"HELMET REVIEW: Rider #{r_idx + 1}",
+                        (r_box[0], r_box[1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (0, 165, 255),
+                        2,
+                    )
+                elif helmet_bbox:
+                    cv2.rectangle(
+                        annotated_image,
+                        (helmet_bbox[0], helmet_bbox[1]),
+                        (helmet_bbox[2], helmet_bbox[3]),
+                        (0, 255, 0),
+                        2,
+                    )
+                    cv2.putText(
+                        annotated_image,
+                        f"HELMET OK: Rider #{r_idx + 1} ({helmet_result['helmet_confidence']:.0%})",
+                        (r_box[0], r_box[1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (0, 255, 0),
+                        2,
+                    )
 
         # Check Wrong Side Driving (Task 13)
         wrong_side_detections = self._check_wrong_side(detections, w, h)
         for ws in wrong_side_detections:
             ws_box = ws["box"]
-            p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, ws_box)
+            debug_id = str(uuid.uuid4())
+            p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, ws_box, debug_name=debug_id)
             ocr_metadata = {
                 "plate_number": p_num if o_conf >= 0.50 else "UNKNOWN",
                 "ocr_confidence": o_conf,
@@ -227,7 +386,8 @@ class ViolationEngine:
                 "ocr_debug_paths": ocr_debug.get("debug_paths", {}) if ocr_debug else {},
                 "plate_crop_path": (ocr_debug.get("debug_paths", {}) or {}).get("plate_crop", ""),
                 "enhanced_plate_path": (ocr_debug.get("debug_paths", {}) or {}).get("enhanced_plate", ""),
-                "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", "")
+                "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", ""),
+                "ocr_attempts": ocr_debug.get("ocr_attempts", []) if ocr_debug else []
             }
             
             violations.append({
@@ -243,7 +403,149 @@ class ViolationEngine:
             cv2.putText(annotated_image, "WRONG SIDE DRIVING", (ws_box[0], ws_box[1]-10), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-        processing_time = (time.time() - start_time) * 1000 # convert to ms
+        # Check Seatbelt Non-Compliance (Phase 3 & 4)
+        vehicles = [d for d in detections if d['label'] in ['car', 'truck', 'bus']]
+        for veh in vehicles:
+            veh_box = veh['box']
+            veh_label = veh['label']
+            
+            # Check if seatbelt is present
+            seatbelt_present, sb_conf, driver_box = self.seatbelt_detector.detect_seatbelt(
+                image, veh_box, veh_label
+            )
+            
+            if not seatbelt_present:
+                debug_id = str(uuid.uuid4())
+                p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, veh_box, debug_name=debug_id)
+                ocr_metadata = {
+                    "plate_number": p_num if o_conf >= 0.50 else "UNKNOWN",
+                    "ocr_confidence": o_conf,
+                    "ocr_engine": ocr_debug.get("ocr_engine", "none") if ocr_debug else "none",
+                    "ocr_debug_paths": ocr_debug.get("debug_paths", {}) if ocr_debug else {},
+                    "plate_crop_path": (ocr_debug.get("debug_paths", {}) or {}).get("plate_crop", ""),
+                    "enhanced_plate_path": (ocr_debug.get("debug_paths", {}) or {}).get("enhanced_plate", ""),
+                    "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", ""),
+                    "ocr_attempts": ocr_debug.get("ocr_attempts", []) if ocr_debug else []
+                }
+                
+                violations.append({
+                    "type": "SEATBELT_VIOLATION",
+                    "box": driver_box,
+                    "confidence": sb_conf,
+                    "details": f"Driver in {veh_label} non-compliant with seatbelt safety regulations",
+                    **ocr_metadata
+                })
+                
+                # Draw Vehicle Box
+                cv2.rectangle(annotated_image, (veh_box[0], veh_box[1]), (veh_box[2], veh_box[3]), (0, 255, 255), 2) # Yellow (BGR: 0, 255, 255)
+                # Draw Driver Region (Blue)
+                cv2.rectangle(annotated_image, (driver_box[0], driver_box[1]), (driver_box[2], driver_box[3]), (255, 0, 0), 3) # Blue (BGR: 255, 0, 0)
+                # Draw Violation Label & Seatbelt Status
+                cv2.putText(annotated_image, "NO SEATBELT", (driver_box[0], driver_box[1]-10), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+                # Draw Plate Number & Timestamp
+                cv2.putText(annotated_image, f"Plate: {ocr_metadata['plate_number']}", (veh_box[0], veh_box[3]+20), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                cv2.putText(annotated_image, f"TS: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", (veh_box[0], veh_box[3]+40), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+
+        # Detect traffic signal state once for the entire frame to check both stop-line and red-light violations
+        signal_state, signal_conf, light_box = self.traffic_light_detector.detect_traffic_light(image)
+
+        # Check Stop-Line Violations
+        all_road_vehicles = [d for d in detections if d['label'] in ['car', 'motorcycle', 'truck', 'bus']]
+        for veh in all_road_vehicles:
+            veh_box = veh['box']
+            is_stopline_violation, sl_conf, sl_details = self.traffic_light_detector.check_stop_line_violation(
+                image,
+                veh_box,
+                veh.get('label', 'vehicle'),
+                camera_id=camera_id,
+                detection_confidence=veh.get('confidence', 0.90),
+                signal_state=signal_state,
+                signal_confidence=signal_conf
+            )
+
+            if is_stopline_violation:
+                debug_id = str(uuid.uuid4())
+                p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, veh_box, debug_name=debug_id)
+                ocr_metadata_sl = {
+                    "plate_number": p_num if o_conf >= 0.50 else "UNKNOWN",
+                    "ocr_confidence": o_conf,
+                    "ocr_engine": ocr_debug.get("ocr_engine", "none") if ocr_debug else "none",
+                    "ocr_debug_paths": ocr_debug.get("debug_paths", {}) if ocr_debug else {},
+                    "plate_crop_path": (ocr_debug.get("debug_paths", {}) or {}).get("plate_crop", ""),
+                    "enhanced_plate_path": (ocr_debug.get("debug_paths", {}) or {}).get("enhanced_plate", ""),
+                    "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", ""),
+                    "ocr_attempts": ocr_debug.get("ocr_attempts", []) if ocr_debug else []
+                }
+
+                violations.append({
+                    "type": "STOP_LINE_VIOLATION",
+                    "box": veh_box,
+                    "confidence": sl_conf,
+                    "details": (
+                        f"{veh.get('label', 'Vehicle').title()} front bumper crossed configured stop line "
+                        f"by {sl_details['crossing_distance_px']:.0f}px"
+                    ),
+                    "front_bumper": sl_details["front_bumper"],
+                    "stop_line": sl_details["stop_line"],
+                    "crossing_ratio": sl_details["crossing_ratio"],
+                    "crossing_distance_px": sl_details["crossing_distance_px"],
+                    **ocr_metadata_sl
+                })
+
+                annotated_image = self.traffic_light_detector.annotate_stop_line_violation(
+                    annotated_image,
+                    veh_box,
+                    stop_line=sl_details["stop_line"],
+                    plate_text=ocr_metadata_sl["plate_number"],
+                    location=location
+                )
+
+        # Check Red-Light Violations
+        if signal_state == "RED":
+            all_vehicles = [d for d in detections if d['label'] in ['car', 'motorcycle', 'truck', 'bus']]
+            stop_zone = self.traffic_light_detector.define_stop_zone(h, w)
+            
+            for veh in all_vehicles:
+                veh_box = veh['box']
+                is_violation, rl_conf, rl_details = self.traffic_light_detector.check_red_light_violation(
+                    image, veh_box, veh['label'],
+                    signal_state=signal_state, signal_confidence=signal_conf
+                )
+                
+                if is_violation:
+                    debug_id = str(uuid.uuid4())
+                    p_num, o_conf, _, ocr_debug = self.ocr_engine.extract_plate_details(image, veh_box, debug_name=debug_id)
+                    ocr_metadata_rl = {
+                        "plate_number": p_num if o_conf >= 0.50 else "UNKNOWN",
+                        "ocr_confidence": o_conf,
+                        "ocr_engine": ocr_debug.get("ocr_engine", "none") if ocr_debug else "none",
+                        "ocr_debug_paths": ocr_debug.get("debug_paths", {}) if ocr_debug else {},
+                        "plate_crop_path": (ocr_debug.get("debug_paths", {}) or {}).get("plate_crop", ""),
+                        "enhanced_plate_path": (ocr_debug.get("debug_paths", {}) or {}).get("enhanced_plate", ""),
+                        "ocr_result_path": (ocr_debug.get("debug_paths", {}) or {}).get("ocr_result", ""),
+                        "ocr_attempts": ocr_debug.get("ocr_attempts", []) if ocr_debug else []
+                    }
+                    
+                    violations.append({
+                        "type": "RED_LIGHT_VIOLATION",
+                        "box": veh_box,
+                        "confidence": rl_conf,
+                        "details": f"{veh['label'].title()} crossed stop zone during RED signal (penetration: {rl_details['penetration_ratio']:.0%})",
+                        "signal_confidence": rl_details['signal_confidence'],
+                        "penetration_ratio": rl_details['penetration_ratio'],
+                        **ocr_metadata_rl
+                    })
+                    
+                    # Annotate red-light violation on image
+                    annotated_image = self.traffic_light_detector.annotate_red_light_violation(
+                        annotated_image, veh_box, light_box, stop_zone, 
+                        ocr_metadata_rl['plate_number']
+                    )
+
+        processing_time = (time.perf_counter() - start_time) * 1000 # convert to ms
         logger.info(f"Processed frame in {processing_time:.1f}ms. Found {len(violations)} violations.")
         
         return {
@@ -258,7 +560,8 @@ class ViolationEngine:
             "ocr_confidence": ocr_conf,
             "ocr_engine": best_ocr_debug.get("ocr_engine", "none") if best_ocr_debug else "none",
             "ocr_debug": best_ocr_debug,
-            "ocr_debug_paths": best_ocr_debug.get("debug_paths", {}) if best_ocr_debug else {}
+            "ocr_debug_paths": best_ocr_debug.get("debug_paths", {}) if best_ocr_debug else {},
+            "helmet_debug": helmet_debug,
         }
 
     def _enhance_image(self, image):

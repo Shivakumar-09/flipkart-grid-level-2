@@ -5,7 +5,8 @@
     "thumbnail": "https://img.youtube.com/vi/RWhMEkMtLy0/hqdefault.jpg",
     "duration": "3:15",
     "description": "An official Ministry of Road Transport campaign highlighting the physics of helmet protection and head injury prevention during impacts.",
-    "category": "Helmet Safety"
+    "category": "Helmet Safety",
+    "youtubeKey": "HELMET_VIOLATION"
   },
   {
     "title": "Dangers of Triple Riding",
@@ -13,7 +14,8 @@
     "thumbnail": "https://img.youtube.com/vi/GJSEZx0tMlw/hqdefault.jpg",
     "duration": "2:45",
     "description": "Government awareness campaign showing how overloaded two-wheelers compromise suspension, center of gravity, and double braking distance.",
-    "category": "Triple Riding Risks"
+    "category": "Triple Riding Risks",
+    "youtubeKey": "TRIPLE_RIDING"
   },
   {
     "title": "Obeying the Traffic Lights",
@@ -21,7 +23,17 @@
     "thumbnail": "https://img.youtube.com/vi/zDNYSZ1vfpc/hqdefault.jpg",
     "duration": "2:10",
     "description": "An interactive tutorial explaining stopping rules, pedestrian crossing rights, and signal timing etiquette under the Motor Vehicles Act.",
-    "category": "Traffic Signal Rules"
+    "category": "Traffic Signal Rules",
+    "youtubeKey": "RED_LIGHT_VIOLATION"
+  },
+  {
+    "title": "Stop-Line Compliance",
+    "youtube_id": "zDNYSZ1vfpc",
+    "thumbnail": "https://img.youtube.com/vi/zDNYSZ1vfpc/hqdefault.jpg",
+    "duration": "1:50",
+    "description": "Focused guidance on keeping the front bumper behind marked stop lines at signalized junctions and pedestrian crossings.",
+    "category": "Traffic Signal Rules",
+    "youtubeKey": "STOP_LINE_VIOLATION"
   },
   {
     "title": "Seatbelt Awareness Guide",
@@ -29,7 +41,8 @@
     "thumbnail": "https://img.youtube.com/vi/Zj-_EEQQw9M/hqdefault.jpg",
     "duration": "3:05",
     "description": "Ministry of Road Transport safety briefing on how three-point seatbelts prevent occupant cabin ejection and distribute decelerating forces.",
-    "category": "Seatbelt Awareness"
+    "category": "Seatbelt Awareness",
+    "youtubeKey": "SEATBELT_VIOLATION"
   },
   {
     "title": "Wrong Side Driving Consequences",
@@ -37,7 +50,8 @@
     "thumbnail": "https://img.youtube.com/vi/tgxAMRBcQwk/hqdefault.jpg",
     "duration": "3:30",
     "description": "BTP advisory warning against dangerous wrong side driving, lane violation, and head-on junction hazards.",
-    "category": "Wrong Side Driving"
+    "category": "Wrong Side Driving",
+    "youtubeKey": "WRONG_SIDE_DRIVING"
   },
   {
     "title": "Smart Municipal Parking Etiquettes",
@@ -45,7 +59,8 @@
     "thumbnail": "https://img.youtube.com/vi/bbcSVu-kr2o/hqdefault.jpg",
     "duration": "1:55",
     "description": "A guide to understanding yellow curbs, towing policies, and how obstructing lanes disrupts peak transit flows.",
-    "category": "Illegal Parking"
+    "category": "Illegal Parking",
+    "youtubeKey": "ILLEGAL_PARKING"
   },
   {
     "title": "Yielding to Emergency Vehicles",
@@ -53,6 +68,7 @@
     "thumbnail": "https://img.youtube.com/vi/xrDilEoPlNw/hqdefault.jpg",
     "duration": "2:20",
     "description": "WHO global road safety campaign outlining the legal obligation and technique to safely yield the right of way to active sirens.",
-    "category": "Emergency Vehicles"
+    "category": "Emergency Vehicles",
+    "youtubeKey": "EMERGENCY_VEHICLE"
   }
 ]

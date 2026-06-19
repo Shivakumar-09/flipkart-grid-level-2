@@ -6,10 +6,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!container) return;
         const toast = document.createElement("div");
         const colors = {
-            success: { bg: "rgba(16,185,129,0.95)",  border: "#10b981" },
-            error:   { bg: "rgba(239,68,68,0.95)",   border: "#ef4444" },
-            warning: { bg: "rgba(245,158,11,0.95)",  border: "#f59e0b" },
-            info:    { bg: "rgba(0,240,255,0.92)",   border: "#00f0ff" }
+            success: { bg: "rgba(16,185,129,0.95)", border: "#10b981" },
+            error: { bg: "rgba(239,68,68,0.95)", border: "#ef4444" },
+            warning: { bg: "rgba(245,158,11,0.95)", border: "#f59e0b" },
+            info: { bg: "rgba(0,240,255,0.92)", border: "#00f0ff" }
         };
         const c = colors[type] || colors.info;
         const icons = { success: "✅", error: "❌", warning: "⚠️", info: "ℹ️" };
@@ -106,6 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Safety Hub & Challan Modal Global State
     let loadedLogs = [];
+    let activeChallanLog = null;
     let youtubeLinks = {};
     let currentQuestionIndex = 0;
     let quizScore = 0;
@@ -135,29 +136,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 const riskZonesEl = document.getElementById("cc-risk-zones");
                 const pendingEl = document.getElementById("cc-pending-challans");
                 const policeAlertsEl = document.getElementById("cc-police-alerts");
-                
+
                 animateValue(vTodayEl, 0, parseInt(data.kpis.total_violations_today) || 0, 1000);
                 animateValue(riskZonesEl, 0, parseInt(data.kpis.high_risk_zones) || 0, 1000);
                 animateValue(pendingEl, 0, parseInt(data.kpis.pending_challans) || 0, 1000);
-                
+
                 liveAlertsCount = data.alerts ? data.alerts.length : 0;
                 if (policeAlertsEl) policeAlertsEl.textContent = liveAlertsCount;
-                
+
                 // Initialize Leaflet Map
                 initMap(data.markers);
-                
+
                 // Populate Top Hotspots Decision Matrix
                 populateHotspotsMatrix(data.markers);
-                
+
                 // Populate Smart Insights
                 populateSmartInsights(data.insights);
-                
+
                 // Populate Real-Time Alert Feed
                 populateLiveAlertFeed(data.alerts);
-                
+
                 // Start Alert Simulation loop
                 startAlertSimulation();
-                
+
                 // Start CCTV streams simulation (Phase 5)
                 startCCTVFeedsSim();
             })
@@ -166,21 +167,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function initMap(markers) {
         if (trafficMapInstance) return;
-        
+
         // Centered on Bengaluru [12.9716, 77.5946]
         trafficMapInstance = L.map('traffic-map', {
             zoomControl: true,
             scrollWheelZoom: true,
             attributionControl: false
         }).setView([12.9716, 77.5946], 11.5);
-        
+
         // CartoDB Dark Matter tiles
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
             subdomains: 'abcd',
             maxZoom: 20
         }).addTo(trafficMapInstance);
-        
+
         // Add markers
         markers.forEach(m => {
             const pulseClass = `pulse-${m.color}`;
@@ -191,7 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 iconAnchor: [7, 7],
                 popupAnchor: [0, -7]
             });
-            
+
             const popupContent = `
                 <div class="map-popup-container">
                     <div class="map-popup-header">
@@ -214,12 +215,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="map-popup-action">${m.action}</div>
                 </div>
             `;
-            
+
             L.marker(m.coordinates, { icon: customIcon })
                 .addTo(trafficMapInstance)
                 .bindPopup(popupContent);
         });
-        
+
         // Trigger map invalidate size slightly after loading to prevent grey tiles
         setTimeout(() => {
             trafficMapInstance.invalidateSize();
@@ -229,16 +230,16 @@ document.addEventListener("DOMContentLoaded", () => {
     function populateHotspotsMatrix(markers) {
         const listEl = document.getElementById("cc-hotspots-list");
         if (!listEl) return;
-        
+
         listEl.innerHTML = "";
         const sorted = [...markers].sort((a, b) => b.risk_score - a.risk_score);
-        
+
         sorted.slice(0, 5).forEach(m => {
             let badgeColorClass = "score-low";
             if (m.color === "red") badgeColorClass = "score-critical";
             else if (m.color === "orange") badgeColorClass = "score-high";
             else if (m.color === "yellow") badgeColorClass = "score-medium";
-            
+
             const row = document.createElement("div");
             row.className = "hotspot-row";
             row.innerHTML = `
@@ -265,23 +266,23 @@ document.addEventListener("DOMContentLoaded", () => {
     function populateLiveAlertFeed(alerts) {
         const feedEl = document.getElementById("cc-live-feed");
         if (!feedEl) return;
-        
+
         feedEl.innerHTML = "";
         if (!alerts || alerts.length === 0) {
             feedEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">No active command alerts.</div>`;
             return;
         }
-        
+
         alerts.forEach(a => {
             const timeStr = a.timestamp.split(" ")[1] || a.timestamp;
             let badgeColor = "green";
             if (a.severity === "HIGH") badgeColor = "red";
             else if (a.severity === "MEDIUM") badgeColor = "orange";
-            
+
             let actionText = "Surveillance active";
             if (a.severity === "HIGH") actionText = "👮 Deploy patrol unit";
             else if (a.severity === "MEDIUM") actionText = "🚨 Dispatch officer";
-            
+
             const item = document.createElement("div");
             item.className = "feed-item";
             item.innerHTML = `
@@ -301,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let alertSimulationInterval = null;
     function startAlertSimulation() {
         if (alertSimulationInterval) return;
-        
+
         const LOCATIONS = [
             "Silk Board Junction, Bengaluru",
             "Whitefield ITPL Road, Bengaluru",
@@ -314,45 +315,47 @@ document.addEventListener("DOMContentLoaded", () => {
             "Majestic Bus Station, Bengaluru",
             "Yelahanka Circle, Bengaluru"
         ];
-        
+
         const VIOLATIONS = [
             { type: "HELMET_VIOLATION", text: "Helmet non-compliance detected" },
             { type: "TRIPLE_RIDING", text: "Triple riding motorcycle violation detected" },
             { type: "WRONG_SIDE_DRIVING", text: "Dangerous wrong-side driving detected" },
             { type: "ILLEGAL_PARKING", text: "Illegal obstruction parking detected" },
-            { type: "SEATBELT_VIOLATION", text: "Seatbelt compliance infraction detected" }
+            { type: "SEATBELT_VIOLATION", text: "Seatbelt compliance infraction detected" },
+            { type: "RED_LIGHT_VIOLATION", text: "Red-light signal jumping violation detected" },
+            { type: "STOP_LINE_VIOLATION", text: "Stop-line crossing violation detected" }
         ];
-        
+
         const CONGESTION_MESSAGES = [
             "Severe bumper-to-bumper queue building up. recommended patrol unit deployment.",
             "Vehicle density exceeding threshold. Traffic flow speed reduced to <15 km/h.",
             "Gridlock forming at intersection. Requesting manual override signals."
         ];
-        
+
         alertSimulationInterval = setInterval(() => {
             const feedEl = document.getElementById("cc-live-feed");
             if (!feedEl) return;
-            
+
             if (feedEl.textContent.includes("No active command alerts")) {
                 feedEl.innerHTML = "";
             }
-            
+
             const date = new Date();
             const timeStr = date.toLocaleTimeString("en-US", { hour12: false });
-            
+
             let isViolation = Math.random() < 0.6;
             let severity = "LOW";
             let msg = "";
             let actionText = "Surveillance active";
             let badgeColor = "green";
-            
+
             const loc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
             const shortLoc = loc.split(",")[0];
-            
+
             if (isViolation) {
                 const viol = VIOLATIONS[Math.floor(Math.random() * VIOLATIONS.length)];
                 msg = `🚨 VIOLATION: ${viol.text} at ${shortLoc}. Auto-challan ticket dispatched.`;
-                
+
                 if (viol.type === "WRONG_SIDE_DRIVING" || viol.type === "TRIPLE_RIDING") {
                     severity = "HIGH";
                     badgeColor = "red";
@@ -369,7 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 badgeColor = "red";
                 actionText = "👮 Dispatch traffic unit";
             }
-            
+
             const item = document.createElement("div");
             item.className = "feed-item";
             item.innerHTML = `
@@ -382,17 +385,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span>${actionText}</span>
                 </div>
             `;
-            
+
             feedEl.insertBefore(item, feedEl.firstChild);
-            
+
             if (feedEl.children.length > 15) {
                 feedEl.removeChild(feedEl.lastChild);
             }
-            
+
             liveAlertsCount++;
             const policeAlertsEl = document.getElementById("cc-police-alerts");
             if (policeAlertsEl) policeAlertsEl.textContent = liveAlertsCount;
-            
+
             if (isViolation) {
                 const totalViolEl = document.getElementById("cc-violations-today");
                 if (totalViolEl) {
@@ -420,15 +423,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!chartTelemetry) return;
         const canvas = document.getElementById("analyticsChart");
         if (!canvas) return;
-        
+
         const ctx = canvas.getContext("2d");
         if (analyticsChartInstance) analyticsChartInstance.destroy();
-        
+
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
-        
+
         let config = {};
-        
+
         if (chartType === "hourly") {
             const labels = chartTelemetry.hourly.map(item => item.hour);
             const values = chartTelemetry.hourly.map(item => item.count);
@@ -586,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             };
         }
-        
+
         analyticsChartInstance = new Chart(ctx, config);
     }
 
@@ -610,7 +613,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const totalTodayEl = document.getElementById("cc-violations-today") || document.getElementById("metric-total-today");
                 const alertsEl = document.getElementById("cc-police-alerts") || document.getElementById("metric-active-alerts");
                 const pendingEl = document.getElementById("cc-pending-challans") || document.getElementById("metric-pending-challans");
-                
+
                 // Animate numeric counters
                 if (totalTodayEl) animateValue(totalTodayEl, 0, parseInt(data.total_violations_today) || 0, 1000);
                 if (alertsEl) animateValue(alertsEl, 0, parseInt(data.active_alerts) || 0, 1000);
@@ -689,20 +692,23 @@ document.addEventListener("DOMContentLoaded", () => {
         // Breakdown Doughnut Chart
         const ctxBreakdown = document.getElementById("breakdownChart").getContext("2d");
         if (breakdownChartInstance) breakdownChartInstance.destroy();
-        
+
         const bData = data.breakdown;
         breakdownChartInstance = new Chart(ctxBreakdown, {
             type: 'doughnut',
             data: {
-                labels: ['Helmet Non-compliance', 'Triple Riding', 'Wrong-side Driving', 'Illegal Parking'],
+                labels: ['Helmet Non-compliance', 'Triple Riding', 'Wrong-side Driving', 'Illegal Parking', 'Seatbelt Non-Compliance', 'Red-Light Violation', 'Stop-Line Violation'],
                 datasets: [{
                     data: [
                         bData.HELMET_VIOLATION || 0,
                         bData.TRIPLE_RIDING || 0,
                         bData.WRONG_SIDE_DRIVING || 0,
-                        bData.ILLEGAL_PARKING || 0
+                        bData.ILLEGAL_PARKING || 0,
+                        bData.SEATBELT_VIOLATION || 0,
+                        bData.RED_LIGHT_VIOLATION || 0,
+                        bData.STOP_LINE_VIOLATION || 0
                     ],
-                    backgroundColor: ['#ff4d6d', '#ffb800', '#00f0ff', '#0df0a6'],
+                    backgroundColor: ['#ff4d6d', '#ffb800', '#00f0ff', '#0df0a6', '#bd53e9', '#ff3333', '#38bdf8'],
                     borderWidth: 0,
                     hoverOffset: 4
                 }]
@@ -815,7 +821,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     else if (sms.status === "DEMO_SENT") statusClass = "status-demo";
                     const messageText = sms.message || "";
                     const challanText = sms.challan_id ? `<div class="sms-challan-id">${sms.challan_id}</div>` : "";
-                    
+
                     row.innerHTML = `
                         <td>${sms.timestamp}</td>
                         <td title="${messageText.replace(/"/g, "&quot;")}"><span class="sms-type">${sms.type}</span>${challanText}</td>
@@ -839,7 +845,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     tableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No violation records logged in the database yet.</td></tr>`;
                     return;
                 }
-                
+
                 logs.forEach(log => {
                     const row = document.createElement("tr");
                     const typeClass = log.violation_type.toLowerCase().split("_")[0];
@@ -856,7 +862,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                     tableBody.appendChild(row);
                 });
-                
+
                 // Bind Modal clicks
                 bindThumbClicks();
                 bindChallanClicks();
@@ -926,7 +932,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const timestamp = new Date().getTime();
         const resImg = document.getElementById("res-img");
         const resVideo = document.getElementById("res-video");
-        
+
         if (resData.evidence_video_path) {
             if (resImg) resImg.style.display = "none";
             if (resVideo) {
@@ -987,7 +993,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     uploadForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-        
+
         const btnProcess = document.getElementById("btn-process");
         btnProcess.textContent = "Processing Frame Inference...";
         btnProcess.disabled = true;
@@ -1010,7 +1016,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             btnProcess.textContent = "Execute Inference Pipeline";
             btnProcess.disabled = false;
-            
+
             if (!response.ok || resData.error) {
                 showToast("Processing failed: " + (resData.error || `HTTP ${response.status}`), "error");
                 return;
@@ -1042,7 +1048,7 @@ document.addEventListener("DOMContentLoaded", () => {
     searchInput.addEventListener("input", () => {
         const query = searchInput.value.toLowerCase();
         const rows = document.querySelectorAll("#violations-table-body tr");
-        
+
         rows.forEach(row => {
             const cells = Array.from(row.getElementsByTagName("td"));
             if (cells.length > 1) {
@@ -1138,8 +1144,18 @@ document.addEventListener("DOMContentLoaded", () => {
             desc: "A breakdown of rules at signalized intersections, stop-line compliance, and yellow light timing safety.",
             duration: "2:10",
             localPath: "",
-            youtubeKey: "TRAFFIC_SIGNAL_RULE",
+            youtubeKey: "RED_LIGHT_VIOLATION",
             thumbnail: "https://images.unsplash.com/photo-1510935515286-9a2df752d5b6?w=500&auto=format&fit=crop&q=60"
+        },
+        {
+            id: "stop_line_compliance",
+            category: "Traffic Signal Rules",
+            title: "Stop-Line Compliance",
+            desc: "How to stop before marked lines at signalized junctions and pedestrian crossings.",
+            duration: "1:50",
+            localPath: "",
+            youtubeKey: "STOP_LINE_VIOLATION",
+            thumbnail: "https://images.unsplash.com/photo-1494526585095-c41746248156?w=500&auto=format&fit=crop&q=60"
         },
         {
             id: "seatbelt_awareness",
@@ -1284,6 +1300,17 @@ document.addEventListener("DOMContentLoaded", () => {
             ],
             answer: 3,
             explanation: "Parking is prohibited near junctions, bus stops, bridges, footpaths, pedestrian crossings, and fire hydrants to prevent accidents."
+        },
+        {
+            question: "What is the penalty under Indian Motor Vehicles Act for jumping a red traffic signal?",
+            options: [
+                "₹500 fine and no penalty points",
+                "₹1,000 fine with a 3-month license suspension",
+                "₹1,000 to ₹5,000 fine or imprisonment up to 6 months, or both",
+                "₹10,000 fine and vehicle impoundment for 30 days"
+            ],
+            answer: 2,
+            explanation: "Under Section 119/177 of the Motor Vehicles Act, jumping a red signal attracts a fine of ₹1,000 to ₹5,000 or imprisonment up to 6 months, or both."
         }
     ];
 
@@ -1306,15 +1333,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function openChallanModal(log) {
         const challanModal = document.getElementById("challan-modal");
         if (!challanModal) return;
-        
+
         // Configure header with PDF download link
         document.getElementById("modal-challan-id").innerHTML = `CHALLAN: ${log.challan_id} <a href="/challans/${log.challan_id}.pdf" target="_blank" class="btn secondary" style="font-size: 0.72rem; padding: 4px 8px; margin-left: 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; width: auto;">📥 PDF</a>`;
-        
+
         const badge = document.getElementById("modal-violation-badge");
         badge.textContent = log.violation_type;
         const typeClass = log.violation_type.toLowerCase().split("_")[0];
         badge.className = `badge ${typeClass}`;
-        
+
         // Configure tabs - show ALL tabs!
         const tabs = document.querySelectorAll("#challan-modal .tab-btn");
         tabs.forEach(btn => {
@@ -1325,42 +1352,91 @@ document.addEventListener("DOMContentLoaded", () => {
                 btn.classList.remove("active");
             }
         });
-        
+
         // Set images
         const timestamp = new Date().getTime();
         document.getElementById("modal-annotated-img").src = `/${log.evidence_image_path}?t=${timestamp}`;
         document.getElementById("modal-original-img").src = `/${log.evidence_path}/original.jpg?t=${timestamp}`;
-        
+
         // Activate default tab (annotated)
         document.getElementById("tab-annotated").classList.add("active");
         document.getElementById("tab-original").classList.remove("active");
         document.getElementById("tab-video").classList.remove("active");
-        
+
         // Clear player container to stop background audio
         document.getElementById("player-container").innerHTML = "";
+
+        // Populate Telemetry info by ID
+        activeChallanLog = log;
         
-        // Populate Telemetry info
-        const infoGrid = document.querySelector("#challan-modal .info-grid");
-        if (infoGrid) {
-            infoGrid.innerHTML = `
-                <div><span class="label">Date & Time</span><span class="val">${log.timestamp}</span></div>
-                <div><span class="label">Location</span><span class="val">${log.location}</span></div>
-                <div><span class="label">Camera ID</span><span class="val">${log.camera_id}</span></div>
-                <div><span class="label">Detected Plate</span><span class="val monospace">${log.plate_number || 'UNKNOWN'}</span></div>
-                <div><span class="label">OCR Confidence</span><span class="val">${(Number(log.ocr_confidence || 0) * 100).toFixed(0)}%</span></div>
-                <div><span class="label">OCR Engine</span><span class="val">${log.ocr_engine || "none"}</span></div>
-                <div><span class="label">Fine Amount</span><span class="val text-danger">₹${log.amount}</span></div>
-            `;
+        setText("modal-timestamp", log.timestamp);
+        setText("modal-location", log.location);
+        setText("modal-camera-id", log.camera_id);
+        setText("modal-plate-number", log.plate_number || 'UNKNOWN');
+        setText("modal-confidence", `${(Number(log.ocr_confidence || 0) * 100).toFixed(0)}%`);
+        setText("modal-ocr-engine", log.ocr_engine || "none");
+        setText("modal-fine-amount", `₹${log.amount}`);
+
+        // Populate OCR Debugger crops
+        const debugPaths = log.ocr_debug_paths || {};
+        const vehicleCrop = debugPaths.vehicle_crop || `${log.evidence_path}/original.jpg`;
+        const plateCrop = debugPaths.plate_crop || log.plate_crop_path || '';
+        const enhancedPlate = debugPaths.enhanced_plate || log.enhanced_plate_path || '';
+        
+        setImageSrc("modal-ocr-vehicle-crop", vehicleCrop ? `/${vehicleCrop}?t=${timestamp}` : '');
+        setImageSrc("modal-ocr-plate-crop", plateCrop ? `/${plateCrop}?t=${timestamp}` : '');
+        setImageSrc("modal-ocr-enhanced-plate", enhancedPlate ? `/${enhancedPlate}?t=${timestamp}` : '');
+        
+        // Populate OCR attempts table
+        const attemptsBody = document.getElementById("modal-ocr-attempts-body");
+        if (attemptsBody) {
+            attemptsBody.innerHTML = "";
+            const attempts = Array.isArray(log.ocr_attempts) ? log.ocr_attempts : [];
+            if (attempts.length === 0) {
+                attemptsBody.innerHTML = `<tr><td colspan="5" style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 0.72rem;">No attempts recorded in this package.</td></tr>`;
+            } else {
+                attempts.forEach(att => {
+                    const tr = document.createElement("tr");
+                    tr.style.borderBottom = "1px solid rgba(255,255,255,0.02)";
+                    const validBadge = att.valid 
+                        ? `<span class="badge emerald" style="font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; color: #10b981; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2);">PASS</span>` 
+                        : `<span class="badge red" style="font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; color: #ef4444; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);">FAIL</span>`;
+                    tr.innerHTML = `
+                        <td style="padding: 4px 6px; color: var(--text-primary); font-family: monospace;">${att.engine || 'none'}</td>
+                        <td style="padding: 4px 6px; color: var(--text-secondary);">${att.variant || 'none'}</td>
+                        <td style="padding: 4px 6px; color: var(--accent-cyan); font-family: monospace; font-weight: 600;">${att.raw_text || '--'}</td>
+                        <td style="padding: 4px 6px; text-align: right; color: var(--accent-emerald); font-weight: 600;">${((Number(att.confidence) || 0) * 100).toFixed(0)}%</td>
+                        <td style="padding: 4px 6px; text-align: center;">${validBadge}</td>
+                    `;
+                    attemptsBody.appendChild(tr);
+                });
+            }
         }
-        
+
+        // Reset Edit Plate controls
+        const editPlateInput = document.getElementById("edit-plate-input");
+        const modalPlateNumber = document.getElementById("modal-plate-number");
+        const editPlateBtn = document.getElementById("edit-plate-btn");
+        const savePlateBtn = document.getElementById("save-plate-btn");
+        const cancelPlateBtn = document.getElementById("cancel-plate-btn");
+
+        if (editPlateInput && modalPlateNumber) {
+            editPlateInput.value = log.plate_number || "";
+            editPlateInput.style.display = "none";
+            modalPlateNumber.style.display = "";
+            if (editPlateBtn) editPlateBtn.style.display = "";
+            if (savePlateBtn) savePlateBtn.style.display = "none";
+            if (cancelPlateBtn) cancelPlateBtn.style.display = "none";
+        }
+
         // Show recommended safety video based on violation type
-        const matchingVideo = VIDEO_DATABASE.find(v => v.youtubeKey === log.violation_type) 
+        const matchingVideo = VIDEO_DATABASE.find(v => v.youtubeKey === log.violation_type)
             || VIDEO_DATABASE.find(v => v.id === "helmet_safety"); // default fallback
-            
+
         if (matchingVideo) {
             document.getElementById("modal-rec-title").textContent = matchingVideo.title;
             document.getElementById("modal-rec-desc").textContent = matchingVideo.desc;
-            
+
             // Wire "Watch Now" action in the recommended block
             const watchRecBtn = document.getElementById("modal-btn-watch-rec");
             watchRecBtn.onclick = () => {
@@ -1375,12 +1451,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("tab-annotated").classList.remove("active");
                 document.getElementById("tab-original").classList.remove("active");
                 document.getElementById("tab-video").classList.add("active");
-                
+
                 // Play video
                 loadVideoIntoPlayer(matchingVideo);
             };
         }
-        
+
         // Show modal
         challanModal.style.display = "block";
     }
@@ -1406,7 +1482,7 @@ document.addEventListener("DOMContentLoaded", () => {
         firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
 
-    window.onYouTubeIframeAPIReady = function() {
+    window.onYouTubeIframeAPIReady = function () {
         console.log("YouTube Player API Ready.");
     };
 
@@ -1414,20 +1490,20 @@ document.addEventListener("DOMContentLoaded", () => {
         activeVideoRecord = video;
         maxWatchedPercentage = 0;
         isVideoCompleted = false;
-        
+
         // Populate modal text details
         document.getElementById("video-modal-title").textContent = video.title;
         document.getElementById("video-modal-category").textContent = video.category;
         document.getElementById("video-modal-duration").textContent = `Duration: ${video.duration}`;
         document.getElementById("video-modal-description").textContent = video.description || video.desc || "";
-        
+
         // Open Dedicated Video modal
         const modal = document.getElementById("video-player-modal");
         modal.style.display = "block";
-        
+
         // Empty the container
         document.getElementById("youtube-player-container").innerHTML = '<div id="yt-player-target"></div>';
-        
+
         // Create player
         ytPlayerInstance = new YT.Player('yt-player-target', {
             height: '100%',
@@ -1478,20 +1554,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function saveProgressToBackend() {
         if (!activeVideoRecord) return;
-        
+
         let totalDurationSec = 0;
         if (ytPlayerInstance && ytPlayerInstance.getDuration) {
             totalDurationSec = ytPlayerInstance.getDuration();
         }
-        
+
         if (totalDurationSec <= 0) {
             const parts = activeVideoRecord.duration.split(":");
             totalDurationSec = parseInt(parts[0]) * 60 + parseInt(parts[1]);
         }
-        
+
         const compPct = isVideoCompleted ? 100 : Math.min(100, maxWatchedPercentage);
         const watchDuration = Math.round((compPct / 100.0) * totalDurationSec);
-        
+
         fetch("/api/video_views", {
             method: "POST",
             headers: {
@@ -1505,14 +1581,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 completion_percentage: compPct
             })
         })
-        .then(res => res.json())
-        .then(data => {
-            // Refresh safety analytics and locking mechanisms
-            loadSafetyHubData();
-            showToast("Watch progress updated!", "success");
-        })
-        .catch(err => console.error("Error saving video watch progress:", err));
-        
+            .then(res => res.json())
+            .then(data => {
+                // Refresh safety analytics and locking mechanisms
+                loadSafetyHubData();
+                showToast("Watch progress updated!", "success");
+            })
+            .catch(err => console.error("Error saving video watch progress:", err));
+
         activeVideoRecord = null;
     }
 
@@ -1525,7 +1601,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (ytPlayerInstance) {
                 try {
                     ytPlayerInstance.destroy();
-                } catch(e) {
+                } catch (e) {
                     console.error(e);
                 }
                 ytPlayerInstance = null;
@@ -1566,26 +1642,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 const totalEl = document.getElementById("stats-videos-watched");
                 const viewedEl = document.getElementById("stats-most-viewed-cat");
                 const scoreEl = document.getElementById("stats-safety-score");
-                
+
                 if (totalEl) totalEl.textContent = data.total_videos_watched || "0";
                 if (viewedEl) {
-                    viewedEl.textContent = data.most_popular_categories.length > 0 
-                        ? data.most_popular_categories[0].category 
+                    viewedEl.textContent = data.most_popular_categories.length > 0
+                        ? data.most_popular_categories[0].category
                         : "None";
                 }
-                
+
                 completedVideosCount = data.completed_categories_count || 0;
                 completedVideoCategories = data.completed_categories || [];
-                
+
                 // Calculate Safety Awareness Score
                 const videoCompletionPct = data.video_completion_rate || 0.0;
                 const savedQuizScore = parseInt(localStorage.getItem("trafficflow_quiz_score") || "0");
                 const safetyScoreValue = Math.round((videoCompletionPct * 0.5) + (savedQuizScore * 0.5));
-                
+
                 if (scoreEl) {
                     renderSafetyBadges(safetyScoreValue);
                 }
-                
+
                 // Quiz Lock Control
                 const startQuizBtn = document.getElementById("btn-start-quiz");
                 const quizStartScreen = document.getElementById("quiz-start-screen");
@@ -1593,7 +1669,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Remove any existing lock text
                     const lockText = quizStartScreen.querySelector(".quiz-lock-warning");
                     if (lockText) lockText.remove();
-                    
+
                     if (completedVideosCount >= 1) {
                         startQuizBtn.disabled = false;
                         startQuizBtn.innerHTML = "Start Safety Challenge";
@@ -1604,7 +1680,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         startQuizBtn.innerHTML = "🔒 Start Safety Challenge (Locked)";
                         startQuizBtn.style.opacity = "0.6";
                         startQuizBtn.style.cursor = "not-allowed";
-                        
+
                         const warn = document.createElement("p");
                         warn.className = "quiz-lock-warning";
                         warn.style.cssText = "color: #ff4d6d; font-size: 0.82rem; margin-top: 12px; font-weight: 600;";
@@ -1612,7 +1688,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         startQuizBtn.after(warn);
                     }
                 }
-                
+
                 // Certificate Lock Control
                 const previewPanel = document.getElementById("certificate-preview-panel");
                 const viewCertBtn = document.getElementById("btn-view-certificate");
@@ -1621,7 +1697,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Remove old warning
                     const oldWarn = previewPanel.querySelector(".cert-lock-warning");
                     if (oldWarn) oldWarn.remove();
-                    
+
                     if (completedVideosCount >= 3 && savedQuizScore >= 70) {
                         if (viewCertBtn) viewCertBtn.style.display = "inline-block";
                         previewPanel.style.opacity = "1";
@@ -1629,11 +1705,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else {
                         if (viewCertBtn) viewCertBtn.style.display = "none";
                         if (certCanvasContainer) certCanvasContainer.style.display = "none";
-                        
+
                         const warn = document.createElement("div");
                         warn.className = "cert-lock-warning";
                         warn.style.cssText = "margin-top: 15px; padding: 10px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; font-size: 0.78rem; color: #ff6b6b; text-align: center;";
-                        
+
                         const left = Math.max(0, 3 - completedVideosCount);
                         let text = "";
                         if (left > 0 && savedQuizScore < 70) {
@@ -1647,13 +1723,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         previewPanel.appendChild(warn);
                     }
                 }
-                
+
                 // Populate Recently Watched
                 renderRecentlyWatched(data.most_viewed_videos || []);
-                
+
                 // Populate Police analytics tables
                 populatePoliceTables(data);
-                
+
                 // Render trends chart
                 renderSafetyTrendsChart(data.awareness_trends || []);
             })
@@ -1663,10 +1739,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderSafetyBadges(score) {
         const scoreEl = document.getElementById("stats-safety-score");
         if (!scoreEl) return;
-        
+
         let badgeName = "None";
         let badgeColor = "#64748b";
-        
+
         if (score >= 90) {
             badgeName = "Safety Citizen";
             badgeColor = "#00f0ff";
@@ -1680,7 +1756,7 @@ document.addEventListener("DOMContentLoaded", () => {
             badgeName = "Bronze";
             badgeColor = "#cd7f32";
         }
-        
+
         scoreEl.innerHTML = `${score}% <span style="font-size: 0.7rem; display: block; margin-top: 4px; color: ${badgeColor}; font-weight: 700; text-shadow: 0 0 10px ${badgeColor}33;">🛡️ ${badgeName} Badge</span>`;
     }
 
@@ -1688,27 +1764,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const container = document.getElementById("safety-recents-container");
         const grid = document.getElementById("video-recents-grid");
         if (!container || !grid) return;
-        
+
         if (watchedList.length === 0) {
             container.style.display = "none";
             return;
         }
-        
+
         container.style.display = "block";
         grid.innerHTML = "";
-        
+
         // Show top 3 recently watched videos
         let renderedCount = 0;
         watchedList.forEach(w => {
             if (renderedCount >= 3) return;
             const video = VIDEO_DATABASE.find(v => v.title === w.video_title);
             if (!video) return;
-            
+
             renderedCount++;
             const card = document.createElement("div");
             card.className = "video-card glass";
             card.style.cssText = "padding: 10px; display: flex; gap: 12px; align-items: center; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.01); transition: transform 0.2s, box-shadow 0.2s;";
-            
+
             card.innerHTML = `
                 <div style="position: relative; width: 80px; height: 50px; border-radius: 6px; overflow: hidden; flex-shrink: 0;">
                     <img src="${video.thumbnail}" style="width: 100%; height: 100%; object-fit: cover;">
@@ -1720,7 +1796,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">Views: ${w.view_count}</span>
                 </div>
             `;
-            
+
             card.style.cursor = "pointer";
             card.addEventListener("mouseover", () => {
                 card.style.transform = "translateY(-2px)";
@@ -1740,7 +1816,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function populatePoliceTables(data) {
         const topicsBody = document.getElementById("safety-topics-table-body");
         const wardsBody = document.getElementById("safety-wards-table-body");
-        
+
         if (topicsBody) {
             topicsBody.innerHTML = "";
             if (data.most_popular_categories.length === 0) {
@@ -1751,7 +1827,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     let badgeColor = "var(--text-muted)";
                     if (compPct >= 90) badgeColor = "var(--accent-emerald)";
                     else if (compPct >= 50) badgeColor = "var(--accent-amber)";
-                    
+
                     const tr = document.createElement("tr");
                     tr.innerHTML = `
                         <td style="font-weight: 600; color: #fff; border-bottom: 1px solid var(--border-color); padding: 8px;">${cat.category}</td>
@@ -1762,7 +1838,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
         }
-        
+
         if (wardsBody) {
             wardsBody.innerHTML = "";
             if (data.awareness_trends.length === 0) {
@@ -1785,15 +1861,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderSafetyTrendsChart(trends) {
         const ctx = document.getElementById("safetyCorrelationChart");
         if (!ctx) return;
-        
+
         if (safetyTrendsChartInstance) {
             safetyTrendsChartInstance.destroy();
         }
-        
+
         const labels = trends.map(t => t.location);
         const awarenessRates = trends.map(t => t.awareness_rate);
         const reductions = trends.map(t => t.reduction_percentage);
-        
+
         safetyTrendsChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1857,7 +1933,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function loadRulesDirectory() {
         const grid = document.getElementById("rules-directory-grid");
         if (!grid) return;
-        
+
         fetch("/api/rules")
             .then(res => res.json())
             .then(rules => {
@@ -1868,7 +1944,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     card.className = "rule-card glass";
                     card.setAttribute("data-title", rule.title.toLowerCase());
                     card.setAttribute("data-desc", rule.description.toLowerCase());
-                    
+
                     let extraInfo = "";
                     if (rule.suspension) {
                         extraInfo = `<div class="rule-section" style="color: var(--accent-red); margin-top: 5px;">⚠️ License impact: ${rule.suspension}</div>`;
@@ -1877,7 +1953,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else if (rule.imprisonment) {
                         extraInfo = `<div class="rule-section" style="color: var(--accent-red); margin-top: 5px;">⚠️ Penalty: ${rule.imprisonment}</div>`;
                     }
-                    
+
                     card.innerHTML = `
                         <div class="rule-header">
                             <div class="rule-title-box">
@@ -1902,37 +1978,37 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderVideoLibrary(filterCategory = "all") {
         const grid = document.getElementById("video-library-grid");
         if (!grid) return;
-        
+
         grid.innerHTML = "";
-        const filtered = filterCategory === "all" 
-            ? VIDEO_DATABASE 
+        const filtered = filterCategory === "all"
+            ? VIDEO_DATABASE
             : VIDEO_DATABASE.filter(v => v.category === filterCategory);
-            
+
         if (filtered.length === 0) {
             grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">No videos found in this category.</div>`;
             return;
         }
-        
+
         // Fetch view completion rates to overlay progress bars
         fetch("/api/safety_analytics")
             .then(res => res.json())
             .then(analyticsData => {
                 const completionMap = analyticsData.category_completion || {};
-                
+
                 filtered.forEach(video => {
                     const compPct = Math.round(completionMap[video.category] || 0.0);
                     const isCompleted = compPct >= 90;
-                    
+
                     const card = document.createElement("div");
                     card.className = "video-card";
                     card.setAttribute("data-title", video.title.toLowerCase());
                     card.setAttribute("data-desc", video.description.toLowerCase());
-                    
+
                     let completionBadge = "";
                     if (isCompleted) {
                         completionBadge = `<span style="position: absolute; top: 10px; right: 10px; z-index: 10; background: var(--accent-emerald); color: #020617; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; box-shadow: 0 2px 8px rgba(13,240,166,0.3);">Completed ✓</span>`;
                     }
-                    
+
                     let progressBar = "";
                     if (compPct > 0) {
                         progressBar = `
@@ -1941,7 +2017,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             </div>
                         `;
                     }
-                    
+
                     card.innerHTML = `
                         <div class="video-thumbnail" style="position: relative;">
                             ${completionBadge}
@@ -1961,13 +2037,13 @@ document.addEventListener("DOMContentLoaded", () => {
                             </div>
                         </div>
                     `;
-                    
+
                     const playTrigger = () => {
                         playVideoInYTPlayer(video);
                     };
                     card.querySelector(".video-thumbnail").addEventListener("click", playTrigger);
                     card.querySelector(".watch-btn").addEventListener("click", playTrigger);
-                    
+
                     grid.appendChild(card);
                 });
             })
@@ -1992,15 +2068,15 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("quiz-progress-text").textContent = `Question ${currentQuestionIndex + 1} of ${QUIZ_QUESTIONS.length}`;
         const progressPercent = ((currentQuestionIndex + 1) / QUIZ_QUESTIONS.length) * 100;
         document.getElementById("quiz-progress-bar").style.width = `${progressPercent}%`;
-        
+
         document.getElementById("quiz-question-title").textContent = question.question;
-        
+
         const optionsList = document.getElementById("quiz-options-list");
         optionsList.innerHTML = "";
-        
+
         selectedOptionIndex = null;
         document.getElementById("btn-next-question").style.display = "none";
-        
+
         question.options.forEach((opt, idx) => {
             const btn = document.createElement("div");
             btn.className = "quiz-option";
@@ -2010,10 +2086,10 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
             btn.addEventListener("click", () => {
                 if (selectedOptionIndex !== null) return;
-                
+
                 selectedOptionIndex = idx;
                 const isCorrect = idx === question.answer;
-                
+
                 if (isCorrect) {
                     quizScore++;
                     btn.classList.add("correct");
@@ -2021,12 +2097,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     btn.classList.add("incorrect");
                     btn.querySelector(".quiz-option-status").textContent = "✗";
-                    
+
                     const correctBtn = optionsList.children[question.answer];
                     correctBtn.classList.add("correct");
                     correctBtn.querySelector(".quiz-option-status").textContent = "✓";
                 }
-                
+
                 document.getElementById("btn-next-question").style.display = "block";
             });
             optionsList.appendChild(btn);
@@ -2045,24 +2121,24 @@ document.addEventListener("DOMContentLoaded", () => {
     function showQuizResults() {
         document.getElementById("quiz-question-screen").style.display = "none";
         document.getElementById("quiz-result-screen").style.display = "block";
-        
+
         const scorePercent = Math.round((quizScore / QUIZ_QUESTIONS.length) * 100);
         document.getElementById("quiz-score-percent").textContent = `${scorePercent}%`;
         document.getElementById("quiz-result-desc").textContent = `You scored ${quizScore} out of ${QUIZ_QUESTIONS.length} questions correct.`;
-        
+
         const emojiEl = document.getElementById("quiz-result-emoji");
         const titleEl = document.getElementById("quiz-result-title");
         const certBtn = document.getElementById("btn-view-certificate");
-        
+
         // Save quiz score to localStorage
         const prevBest = parseInt(localStorage.getItem("trafficflow_quiz_score") || "0");
         if (scorePercent > prevBest) {
             localStorage.setItem("trafficflow_quiz_score", scorePercent.toString());
         }
-        
+
         // Refresh safety hub locks & score
         loadSafetyHubData();
-        
+
         if (scorePercent >= 70) {
             emojiEl.textContent = "🏆";
             titleEl.textContent = "Congratulations! Safety Challenge Cleared";
@@ -2078,30 +2154,30 @@ document.addEventListener("DOMContentLoaded", () => {
     function drawCertificate() {
         const canvas = document.getElementById("certificate-canvas");
         if (!canvas) return;
-        
+
         const ctx = canvas.getContext("2d");
-        
+
         canvas.width = 800;
         canvas.height = 600;
-        
+
         const userName = prompt("Please enter your full name for the certificate:") || "Citizen Rider";
-        
+
         // Background slate gradient
         const grad = ctx.createRadialGradient(400, 300, 50, 400, 300, 500);
         grad.addColorStop(0, "#111827");
         grad.addColorStop(1, "#030712");
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 800, 600);
-        
+
         // Double borders
         ctx.strokeStyle = "#ffb800";
         ctx.lineWidth = 6;
         ctx.strokeRect(20, 20, 760, 560);
-        
+
         ctx.strokeStyle = "#00f0ff";
         ctx.lineWidth = 2;
         ctx.strokeRect(30, 30, 740, 540);
-        
+
         // Corner accents
         ctx.fillStyle = "#00f0ff";
         ctx.fillRect(30, 30, 25, 4);
@@ -2112,29 +2188,29 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.fillRect(30, 545, 4, 25);
         ctx.fillRect(745, 566, 25, 4);
         ctx.fillRect(766, 545, 4, 25);
-        
+
         // Texts
         ctx.textAlign = "center";
         ctx.fillStyle = "#94a3b8";
         ctx.font = "bold 13px 'Outfit', sans-serif";
         ctx.fillText("BENGALURU TRAFFIC POLICE — SMART ENFORCEMENT", 400, 80);
-        
+
         ctx.fillStyle = "#ffb800";
         ctx.font = "bold 32px 'Outfit', sans-serif";
         ctx.fillText("CERTIFICATE OF COMPLIANCE", 400, 130);
-        
+
         ctx.fillStyle = "#00f0ff";
         ctx.font = "14px 'Outfit', sans-serif";
         ctx.fillText("ROAD SAFETY & AWARENESS CHALLENGE", 400, 165);
-        
+
         ctx.fillStyle = "#f1f5f9";
         ctx.font = "italic 16px 'Outfit', sans-serif";
         ctx.fillText("This is proudly awarded to", 400, 220);
-        
+
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 38px 'Outfit', sans-serif";
         ctx.fillText(userName, 400, 275);
-        
+
         // Horizontal line
         ctx.strokeStyle = "rgba(0, 240, 255, 0.4)";
         ctx.lineWidth = 2;
@@ -2142,50 +2218,50 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.moveTo(250, 290);
         ctx.lineTo(550, 290);
         ctx.stroke();
-        
+
         ctx.fillStyle = "#94a3b8";
         ctx.font = "15px 'Outfit', sans-serif";
         ctx.fillText("for demonstrating superior knowledge of road rules, speed limits,", 400, 330);
         ctx.fillText("and defensive driving guidelines aligned with BTP Smart City standards.", 400, 355);
-        
+
         const savedQuizScore = parseInt(localStorage.getItem("trafficflow_quiz_score") || "70");
         ctx.fillStyle = "#0df0a6";
         ctx.font = "bold 18px 'Outfit', sans-serif";
         ctx.fillText(`Evaluation Score: ${savedQuizScore}% — PASS`, 400, 405);
-        
+
         const today = new Date().toLocaleDateString("en-IN", {
             day: "numeric",
             month: "long",
             year: "numeric"
         });
         const serial = `TF-${Math.floor(100000 + Math.random() * 900000)}`;
-        
+
         ctx.textAlign = "left";
         ctx.fillStyle = "#64748b";
         ctx.font = "12px monospace";
         ctx.fillText(`DATE: ${today}`, 60, 480);
         ctx.fillText(`CERTIFICATE ID: ${serial}`, 60, 500);
-        
+
         // Signatures
         ctx.textAlign = "center";
         ctx.strokeStyle = "rgba(148, 163, 184, 0.2)";
         ctx.lineWidth = 1;
-        
+
         ctx.beginPath();
         ctx.moveTo(150, 525);
         ctx.lineTo(290, 525);
         ctx.stroke();
-        
+
         ctx.fillStyle = "#94a3b8";
         ctx.font = "12px 'Outfit', sans-serif";
         ctx.fillText("BTP Commissioner", 220, 542);
-        
+
         ctx.beginPath();
         ctx.moveTo(510, 525);
         ctx.lineTo(650, 525);
         ctx.stroke();
         ctx.fillText("TrafficFlow Director", 580, 542);
-        
+
         // Signatures lines draw
         ctx.strokeStyle = "#00f0ff";
         ctx.lineWidth = 1.5;
@@ -2194,32 +2270,32 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.bezierCurveTo(190, 510, 230, 510, 240, 522);
         ctx.bezierCurveTo(250, 528, 210, 522, 220, 515);
         ctx.stroke();
-        
+
         ctx.strokeStyle = "#ffb800";
         ctx.beginPath();
         ctx.moveTo(540, 516);
         ctx.bezierCurveTo(550, 505, 590, 512, 600, 520);
         ctx.bezierCurveTo(610, 524, 570, 520, 580, 512);
         ctx.stroke();
-        
+
         // Seal Graphic
         ctx.strokeStyle = "rgba(255, 184, 0, 0.3)";
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(400, 480, 35, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         ctx.fillStyle = "rgba(255, 184, 0, 0.05)";
         ctx.fill();
-        
+
         ctx.fillStyle = "#ffb800";
         ctx.font = "8px 'Outfit', sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("OFFICIAL", 400, 478);
         ctx.fillText("BTP SEAL", 400, 488);
-        
+
         document.getElementById("cert-canvas-container").style.display = "block";
-        
+
         const downloadBtn = document.getElementById("btn-download-cert");
         downloadBtn.onclick = () => {
             const link = document.createElement("a");
@@ -2242,13 +2318,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         loadRulesDirectory();
         loadSafetyHubData();
-        
+
         // Search filter input binding
         const safetySearchInput = document.getElementById("safety-search-input");
         if (safetySearchInput) {
             safetySearchInput.addEventListener("input", () => {
                 const query = safetySearchInput.value.toLowerCase().trim();
-                
+
                 // Filter Video cards
                 const videoCards = document.querySelectorAll("#video-library-grid .video-card");
                 videoCards.forEach(card => {
@@ -2260,7 +2336,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         card.style.display = "none";
                     }
                 });
-                
+
                 // Filter Rules cards
                 const ruleCards = document.querySelectorAll("#rules-directory-grid .rule-card");
                 ruleCards.forEach(card => {
@@ -2282,7 +2358,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 filterBtns.forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
                 const cat = btn.getAttribute("data-category");
-                
+
                 // Translate visual filters to category database names
                 let filterVal = "all";
                 if (cat === "Helmet Safety") filterVal = "Helmet Safety";
@@ -2292,11 +2368,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 else if (cat === "Wrong Side Driving") filterVal = "Wrong Side Driving";
                 else if (cat === "Illegal Parking") filterVal = "Illegal Parking";
                 else if (cat === "Emergency Vehicle Awareness") filterVal = "Emergency Vehicles";
-                
+
                 renderVideoLibrary(filterVal);
             });
         });
-        
+
         // Bind featured banner play button
         const featuredPlayBtn = document.getElementById("btn-watch-featured");
         if (featuredPlayBtn) {
@@ -2305,17 +2381,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (video) playVideoInModal(video);
             });
         }
-        
+
         // Bind Quiz buttons
         const startQuizBtn = document.getElementById("btn-start-quiz");
         if (startQuizBtn) startQuizBtn.onclick = startQuiz;
-        
+
         const nextQuestBtn = document.getElementById("btn-next-question");
         if (nextQuestBtn) nextQuestBtn.onclick = nextQuestion;
-        
+
         const viewCertBtn = document.getElementById("btn-view-certificate");
         if (viewCertBtn) viewCertBtn.onclick = drawCertificate;
-        
+
         const restartQuizBtn = document.getElementById("btn-restart-quiz");
         if (restartQuizBtn) restartQuizBtn.onclick = startQuiz;
 
@@ -2334,14 +2410,14 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.addEventListener("click", () => {
                 tabBtns.forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
-                
+
                 const tabId = btn.getAttribute("data-tab");
                 const contents = document.querySelectorAll("#challan-modal .tab-content");
                 contents.forEach(c => c.classList.remove("active"));
-                
+
                 const activeContent = document.getElementById(tabId);
                 if (activeContent) activeContent.classList.add("active");
-                
+
                 // Stop video playback if we leave the video tab
                 if (tabId !== "tab-video") {
                     document.getElementById("player-container").innerHTML = "";
@@ -2351,7 +2427,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         const challanId = titleText.split(" ")[1].split(" ")[0].trim();
                         const log = loadedLogs.find(l => l.challan_id === challanId);
                         if (log) {
-                            const matchingVideo = VIDEO_DATABASE.find(v => v.youtube_id === log.violation_type) 
+                            const matchingVideo = VIDEO_DATABASE.find(v => v.youtubeKey === log.violation_type)
                                 || VIDEO_DATABASE.find(v => v.id === "helmet_safety") || VIDEO_DATABASE[0];
                             if (matchingVideo) {
                                 loadVideoIntoPlayer(matchingVideo);
@@ -2371,21 +2447,21 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("cctv-canvas-3"),
             document.getElementById("cctv-canvas-4")
         ];
-        
+
         const colors = ["#00f0ff", "#0df0a6", "#ffb800", "#ff4d6d"];
-        
+
         canvases.forEach((canvas, idx) => {
             if (!canvas) return;
             const ctx = canvas.getContext("2d");
             let width = canvas.width = 320;
             let height = canvas.height = 180;
-            
+
             let vehicles = [
                 { x: 40, y: 70, dx: 1.2, type: "CAR", size: [24, 16] },
                 { x: 140, y: 110, dx: 1.8, type: "BIKE", size: [12, 18] },
                 { x: 250, y: 60, dx: 1.0, type: "TRUCK", size: [36, 22] }
             ];
-            
+
             function drawFrame() {
                 // Check if the current section is command-center to save CPU
                 const ccSec = document.getElementById("command-center");
@@ -2393,11 +2469,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     requestAnimationFrame(drawFrame);
                     return;
                 }
-                
+
                 // Dark background
                 ctx.fillStyle = "#030712";
                 ctx.fillRect(0, 0, width, height);
-                
+
                 // Draw grid lanes
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
                 ctx.lineWidth = 1.5;
@@ -2407,7 +2483,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.moveTo(0, height * 0.85);
                 ctx.lineTo(width, height * 0.85);
                 ctx.stroke();
-                
+
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
                 ctx.setLineDash([8, 8]);
                 ctx.beginPath();
@@ -2415,25 +2491,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.lineTo(width, height * 0.65);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                
+
                 // Animate and draw simulated detections
                 vehicles.forEach(v => {
                     v.x += v.dx;
                     if (v.x > width + 30) {
                         v.x = -30;
                     }
-                    
+
                     // Vehicle bounding box
                     ctx.strokeStyle = colors[idx];
                     ctx.lineWidth = 1.2;
                     ctx.strokeRect(v.x, v.y, v.size[0], v.size[1]);
-                    
+
                     // Tag overlay
                     ctx.fillStyle = colors[idx];
                     ctx.font = "bold 7px monospace";
-                    ctx.fillText(`${v.type} ${(0.82 + Math.random()*0.15).toFixed(2)}`, v.x, v.y - 4);
+                    ctx.fillText(`${v.type} ${(0.82 + Math.random() * 0.15).toFixed(2)}`, v.x, v.y - 4);
                 });
-                
+
                 // Simulated scanning telemetry line
                 const scanLineY = (Date.now() / 20) % height;
                 ctx.strokeStyle = "rgba(0, 240, 255, 0.03)";
@@ -2442,7 +2518,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.moveTo(0, scanLineY);
                 ctx.lineTo(width, scanLineY);
                 ctx.stroke();
-                
+
                 requestAnimationFrame(drawFrame);
             }
             drawFrame();
@@ -2454,12 +2530,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const roContainer = document.getElementById("repeat-offenders-container");
         if (!roContainer) return;
         roContainer.innerHTML = "";
-        
+
         if (!offenders || offenders.length === 0) {
             roContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">No repeat offenses recorded.</div>`;
             return;
         }
-        
+
         offenders.forEach(ro => {
             const count = parseInt(ro.violations_count) || 0;
             let statusLabel = "WARNING";
@@ -2468,7 +2544,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 statusLabel = "BLACKLISTED";
                 statusClass = "score-critical";
             }
-            
+
             const card = document.createElement("div");
             card.className = "ro-cc-card";
             card.innerHTML = `
@@ -2489,7 +2565,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function loadPatrolRecommendations() {
         const recContainer = document.getElementById("patrol-deployments-container");
         if (!recContainer) return;
-        
+
         fetch("/api/recommendations")
             .then(res => res.json())
             .then(data => {
@@ -2498,13 +2574,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     recContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">No patrol dispatches suggested.</div>`;
                     return;
                 }
-                
+
                 data.forEach((rec, idx) => {
                     let riskClass = "score-low";
                     if (rec.risk_level === "CRITICAL") riskClass = "score-critical";
                     else if (rec.risk_level === "HIGH") riskClass = "score-high";
                     else if (rec.risk_level === "MEDIUM") riskClass = "score-medium";
-                    
+
                     const isDispatched = rec.status === "DISPATCHED";
                     const btnText = isDispatched ? "Deployed ✓" : "Dispatch Patrol";
                     const btnClass = isDispatched ? "rec-dispatch-btn dispatched" : "rec-dispatch-btn";
@@ -2524,14 +2600,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         </div>
                     `;
                     recContainer.appendChild(card);
-                    
+
                     // Bind simulated dispatch action
                     const btn = document.getElementById(`cc-dispatch-btn-${idx}`);
                     if (!isDispatched) {
                         btn.addEventListener("click", () => {
                             btn.disabled = true;
                             btn.textContent = "Deploying...";
-                            
+
                             fetch("/api/dispatch", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
@@ -2540,28 +2616,28 @@ document.addEventListener("DOMContentLoaded", () => {
                                     action: rec.suggested_action,
                                     camera_id: rec.camera_id
                                 })
-                           })
-                           .then(res => res.json())
-                           .then(dispatchRes => {
-                               if (dispatchRes.status === "success") {
-                                   btn.textContent = "Deployed ✓";
-                                   btn.className = "rec-dispatch-btn dispatched";
-                                   btn.disabled = true;
-                                   showToast(`Patrol dispatched to ${rec.location}!`, "success");
-                                   // Trigger full data pull to update logs, notification tables, and charts!
-                                   initDashboardData();
-                               } else {
-                                   showToast("Dispatch failed: " + (dispatchRes.error || "Unknown error"), "error");
-                                   btn.disabled = false;
-                                   btn.textContent = "Dispatch Patrol";
-                               }
-                           })
-                           .catch(err => {
-                               console.error(err);
-                               showToast("Dispatch failed — check server connection.", "error");
-                               btn.disabled = false;
-                               btn.textContent = "Dispatch Patrol";
-                           });
+                            })
+                                .then(res => res.json())
+                                .then(dispatchRes => {
+                                    if (dispatchRes.status === "success") {
+                                        btn.textContent = "Deployed ✓";
+                                        btn.className = "rec-dispatch-btn dispatched";
+                                        btn.disabled = true;
+                                        showToast(`Patrol dispatched to ${rec.location}!`, "success");
+                                        // Trigger full data pull to update logs, notification tables, and charts!
+                                        initDashboardData();
+                                    } else {
+                                        showToast("Dispatch failed: " + (dispatchRes.error || "Unknown error"), "error");
+                                        btn.disabled = false;
+                                        btn.textContent = "Dispatch Patrol";
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error(err);
+                                    showToast("Dispatch failed — check server connection.", "error");
+                                    btn.disabled = false;
+                                    btn.textContent = "Dispatch Patrol";
+                                });
                         });
                     }
                 });
@@ -2573,7 +2649,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function loadPredictiveIntel() {
         const container = document.getElementById("predictive-intel-container");
         if (!container) return;
-        
+
         fetch("/api/predictions")
             .then(res => res.json())
             .then(data => {
@@ -2582,13 +2658,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">Forecast data unavailable.</div>`;
                     return;
                 }
-                
+
                 data.forecast.slice(0, 4).forEach(f => {
                     const probPercent = Math.round(f.violation_probability * 100);
                     let color = "var(--accent-emerald)";
                     if (probPercent > 70) color = "var(--accent-red)";
                     else if (probPercent > 40) color = "var(--accent-amber)";
-                    
+
                     const row = document.createElement("div");
                     row.className = "pred-cc-row";
                     row.innerHTML = `
@@ -2602,7 +2678,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                     container.appendChild(row);
                 });
-                
+
                 const summaryBox = document.createElement("div");
                 summaryBox.style.cssText = "margin-top: 10px; background: rgba(0,240,255,0.03); border: 1px dashed rgba(0,240,255,0.15); border-radius: 8px; padding: 10px; font-size: 0.78rem; line-height: 1.4; color: var(--text-secondary);";
                 summaryBox.innerHTML = `
@@ -2655,7 +2731,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function loadAIPerformanceMetrics() {
         const container = document.getElementById("ai-performance-container");
         if (!container) return;
-        
+
         fetch("/api/evaluation")
             .then(res => res.json())
             .then(data => {
@@ -2664,7 +2740,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px;">AI metrics unavailable.</div>`;
                     return;
                 }
-                
+
                 // Add Inference Time
                 const latencyRow = document.createElement("div");
                 latencyRow.style.cssText = "display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-color); font-weight: 600; color: var(--accent-cyan); font-size: 0.8rem;";
@@ -2673,16 +2749,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span>${data.inference_time_ms} ms</span>
                 `;
                 container.appendChild(latencyRow);
-                
+
                 const stats = data.class_statistics;
                 const classes = [
                     { key: "HELMET_VIOLATION", label: "Helmet Detection" },
                     { key: "TRIPLE_RIDING", label: "Triple Riding" },
                     { key: "WRONG_SIDE_DRIVING", label: "Wrong Side Driving" },
                     { key: "ILLEGAL_PARKING", label: "Illegal Parking" },
+                    { key: "SEATBELT_VIOLATION", label: "Seatbelt" },
+                    { key: "RED_LIGHT_VIOLATION", label: "Red-Light" },
+                    { key: "STOP_LINE_VIOLATION", label: "Stop-Line" },
                     { key: "OCR_ACCURACY", label: "OCR Accuracy" }
                 ];
-                
+
                 classes.forEach(cls => {
                     const cStat = stats[cls.key] || { precision: 90, recall: 88, f1: 89, map: 86 };
                     const row = document.createElement("div");
@@ -2712,48 +2791,48 @@ document.addEventListener("DOMContentLoaded", () => {
         const form = document.getElementById("chatbot-form");
         const input = document.getElementById("chatbot-input");
         const messagesContainer = document.getElementById("chatbot-messages");
-        
+
         if (!widget || !launcher) return;
-        
+
         launcher.addEventListener("click", () => {
             widget.style.display = widget.style.display === "flex" ? "none" : "flex";
         });
-        
+
         closeBtn.addEventListener("click", () => {
             widget.style.display = "none";
         });
-        
+
         form.addEventListener("submit", (e) => {
             e.preventDefault();
             const val = input.value.trim();
             if (!val) return;
-            
+
             appendChatMessage("user", val);
             input.value = "";
-            
+
             const loadingId = appendChatMessage("bot", "Querying BTP database...");
-            
+
             fetch("/api/ai_assistant", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query: val })
             })
-            .then(res => res.json())
-            .then(data => {
-                const loadingMsg = document.getElementById(loadingId);
-                if (loadingMsg) {
-                    loadingMsg.innerHTML = formatBotMessage(data.response);
-                }
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            })
-            .catch(err => {
-                const loadingMsg = document.getElementById(loadingId);
-                if (loadingMsg) {
-                    loadingMsg.textContent = "Error running query. Please try again.";
-                }
-            });
+                .then(res => res.json())
+                .then(data => {
+                    const loadingMsg = document.getElementById(loadingId);
+                    if (loadingMsg) {
+                        loadingMsg.innerHTML = formatBotMessage(data.response);
+                    }
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                })
+                .catch(err => {
+                    const loadingMsg = document.getElementById(loadingId);
+                    if (loadingMsg) {
+                        loadingMsg.textContent = "Error running query. Please try again.";
+                    }
+                });
         });
-        
+
         function appendChatMessage(sender, text) {
             const msg = document.createElement("div");
             const id = "chat-msg-" + Date.now();
@@ -2764,12 +2843,101 @@ document.addEventListener("DOMContentLoaded", () => {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             return id;
         }
-        
+
         function formatBotMessage(text) {
             let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             formatted = formatted.replace(/- \*(.*?)\*/g, '<li>$1</li>');
             formatted = formatted.replace(/\n/g, '<br>');
             return formatted;
+        }
+    }
+
+    // Plate Correction System (Edit/Save/Cancel)
+    function initPlateEditing() {
+        const editPlateBtn = document.getElementById("edit-plate-btn");
+        const savePlateBtn = document.getElementById("save-plate-btn");
+        const cancelPlateBtn = document.getElementById("cancel-plate-btn");
+        const editPlateInput = document.getElementById("edit-plate-input");
+        const modalPlateNumber = document.getElementById("modal-plate-number");
+
+        if (editPlateBtn && savePlateBtn && cancelPlateBtn && editPlateInput && modalPlateNumber) {
+            editPlateBtn.addEventListener("click", () => {
+                editPlateInput.value = modalPlateNumber.textContent.trim();
+                modalPlateNumber.style.display = "none";
+                editPlateBtn.style.display = "none";
+                editPlateInput.style.display = "";
+                savePlateBtn.style.display = "";
+                cancelPlateBtn.style.display = "";
+                editPlateInput.focus();
+            });
+
+            cancelPlateBtn.addEventListener("click", () => {
+                modalPlateNumber.style.display = "";
+                editPlateBtn.style.display = "";
+                editPlateInput.style.display = "none";
+                savePlateBtn.style.display = "none";
+                cancelPlateBtn.style.display = "none";
+            });
+
+            savePlateBtn.addEventListener("click", () => {
+                const newPlateVal = editPlateInput.value.trim().toUpperCase();
+                if (!newPlateVal) {
+                    showToast("License plate registration cannot be empty.", "error");
+                    return;
+                }
+                if (!activeChallanLog || !activeChallanLog.challan_id) {
+                    showToast("No active challan to update.", "error");
+                    return;
+                }
+
+                savePlateBtn.disabled = true;
+                savePlateBtn.textContent = "Saving...";
+
+                fetch(`/api/challan/${activeChallanLog.challan_id}/update_plate`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ plate_number: newPlateVal })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    savePlateBtn.disabled = false;
+                    savePlateBtn.textContent = "💾 Save";
+                    
+                    if (data.status === "success") {
+                        showToast("License plate updated and PDF regenerated successfully!", "success");
+                        
+                        // Update current modal state
+                        modalPlateNumber.textContent = newPlateVal;
+                        activeChallanLog.plate_number = newPlateVal;
+
+                        // Switch back to normal view
+                        modalPlateNumber.style.display = "";
+                        editPlateBtn.style.display = "";
+                        editPlateInput.style.display = "none";
+                        savePlateBtn.style.display = "none";
+                        cancelPlateBtn.style.display = "none";
+
+                        // Force refresh PDF URL cache in browser
+                        const pdfLink = document.querySelector("#modal-challan-id a");
+                        if (pdfLink) {
+                            pdfLink.href = `/challans/${activeChallanLog.challan_id}.pdf?t=${Date.now()}`;
+                        }
+
+                        // Refresh table logs and dashboard telemetry
+                        initDashboardData();
+                    } else {
+                        showToast("Failed to update plate: " + (data.error || "Unknown error"), "error");
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    savePlateBtn.disabled = false;
+                    savePlateBtn.textContent = "💾 Save";
+                    showToast("Server error updating license plate.", "error");
+                });
+            });
         }
     }
 
@@ -2779,4 +2947,5 @@ document.addEventListener("DOMContentLoaded", () => {
     initSafetyHub();
     initChartTabs();
     initAIChatbot();
+    initPlateEditing();
 });

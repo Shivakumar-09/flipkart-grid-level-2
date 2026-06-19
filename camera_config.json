@@ -1,0 +1,65 @@
+{
+  "CAM_BLR_001": {
+    "location": "Silk Board",
+    "stop_line_y": 0.58,
+    "stop_line_x1": 0.05,
+    "stop_line_x2": 0.95
+  },
+  "CAM_BLR_002": {
+    "location": "Whitefield",
+    "stop_line_y": 0.64,
+    "stop_line_x1": 0.08,
+    "stop_line_x2": 0.92
+  },
+  "CAM_BLR_003": {
+    "location": "Electronic City",
+    "stop_line_polygon": [
+      [0.12, 0.52],
+      [0.88, 0.52],
+      [0.92, 0.68],
+      [0.08, 0.68]
+    ]
+  },
+  "CAM_BLR_004": {
+    "location": "Marathahalli",
+    "stop_line_y": 0.60,
+    "stop_line_x1": 0.05,
+    "stop_line_x2": 0.95
+  },
+  "CAM_BLR_005": {
+    "location": "Hebbal",
+    "stop_line_y": 0.57,
+    "stop_line_x1": 0.10,
+    "stop_line_x2": 0.90
+  },
+  "CAM_BLR_006": {
+    "location": "KR Puram",
+    "stop_line_y": 0.62,
+    "stop_line_x1": 0.05,
+    "stop_line_x2": 0.95
+  },
+  "CAM_BLR_007": {
+    "location": "Koramangala",
+    "stop_line_y": 0.59,
+    "stop_line_x1": 0.08,
+    "stop_line_x2": 0.92
+  },
+  "CAM_BLR_008": {
+    "location": "HSR Layout",
+    "stop_line_y": 0.61,
+    "stop_line_x1": 0.06,
+    "stop_line_x2": 0.94
+  },
+  "CAM_BLR_009": {
+    "location": "Majestic",
+    "stop_line_y": 0.56,
+    "stop_line_x1": 0.04,
+    "stop_line_x2": 0.96
+  },
+  "CAM_BLR_010": {
+    "location": "Yelahanka",
+    "stop_line_y": 0.63,
+    "stop_line_x1": 0.10,
+    "stop_line_x2": 0.90
+  }
+}

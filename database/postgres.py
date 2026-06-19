@@ -86,6 +86,7 @@ class Violation(Base):
     vehicle = relationship("Vehicle", back_populates="violations")
     challan = relationship("Challan", back_populates="violation", uselist=False)
     ocr_result = relationship("OCRResult", back_populates="violation", uselist=False)
+    evidence_package = relationship("EvidencePackage", back_populates="violation", uselist=False)
 
 class Challan(Base):
     __tablename__ = "challans"
@@ -187,6 +188,18 @@ class SafetyVideoView(Base):
     watch_timestamp = Column(DateTime, nullable=False)
     watch_duration = Column(Float, default=0.0, nullable=False)
     completion_percentage = Column(Float, default=0.0, nullable=False)
+
+class EvidencePackage(Base):
+    __tablename__ = "evidence_packages"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    evidence_id = Column(String(36), unique=True, index=True, nullable=False)
+    violation_id = Column(String(36), ForeignKey("violations.id"), nullable=False)
+    image_paths = Column(Text, nullable=False)
+    ocr_results = Column(Text, nullable=False)
+    generated_timestamp = Column(DateTime, nullable=False)
+    
+    violation = relationship("Violation", back_populates="evidence_package")
 
 class CameraNode(Base):
     __tablename__ = "camera_nodes"

@@ -10,13 +10,15 @@ Usage:
 
 import os
 import sys
+# Ensure project root is in the path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import requests
 import time
 from database.postgres import SessionLocal, engine, initialize_database, Violation
 
 BASE_URL = "http://127.0.0.1:5000"
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 PASS = "[PASS]"
 FAIL = "[FAIL]"
@@ -41,15 +43,18 @@ print("="*60)
 
 # ── 1. File Existence Tests ──────────────────────────────────
 print("\n[1] Core File Checks")
-test("app.py exists",              lambda: os.path.exists("app.py"))
-test("requirements.txt exists",    lambda: os.path.exists("requirements.txt"))
-test("engine/violation_engine.py", lambda: os.path.exists("engine/violation_engine.py"))
-test("engine/evidence_engine.py",  lambda: os.path.exists("engine/evidence_engine.py"))
-test("engine/analytics_engine.py", lambda: os.path.exists("engine/analytics_engine.py"))
-test("models/ocr_engine.py",       lambda: os.path.exists("models/ocr_engine.py"))
-test("dashboard/templates/index.html", lambda: os.path.exists("dashboard/templates/index.html"))
-test("dashboard/static/app.js",    lambda: os.path.exists("dashboard/static/app.js"))
-test(".gitignore exists",          lambda: os.path.exists(".gitignore"))
+def check_file_exists(rel_path):
+    return os.path.exists(os.path.join(PROJECT_ROOT, rel_path))
+
+test("app.py exists",              lambda: check_file_exists("app.py"))
+test("requirements.txt exists",    lambda: check_file_exists("requirements.txt"))
+test("engine/violation_engine.py", lambda: check_file_exists("engine/violation_engine.py"))
+test("engine/evidence_engine.py",  lambda: check_file_exists("engine/evidence_engine.py"))
+test("engine/analytics_engine.py", lambda: check_file_exists("engine/analytics_engine.py"))
+test("models/ocr_engine.py",       lambda: check_file_exists("models/ocr_engine.py"))
+test("dashboard/templates/index.html", lambda: check_file_exists("dashboard/templates/index.html"))
+test("dashboard/static/app.js",    lambda: check_file_exists("dashboard/static/app.js"))
+test(".gitignore exists",          lambda: check_file_exists(".gitignore"))
 
 # ── 2. Import Tests ──────────────────────────────────────────
 print("\n[2] Python Import Checks")

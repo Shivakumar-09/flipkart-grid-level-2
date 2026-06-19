@@ -323,19 +323,19 @@
                                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">
                                             Vehicle Crop</div>
                                         <img id="ocr-vehicle-crop" src=""
-                                            style="width: 100%; height: 75px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                                            style="width: 100%; height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
                                     </div>
                                     <div style="flex: 1; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">
                                             Plate Crop</div>
                                         <img id="ocr-plate-crop" src=""
-                                            style="width: 100%; height: 75px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                                            style="width: 100%; height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
                                     </div>
                                     <div style="flex: 1; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">
                                             Enhanced Plate</div>
                                         <img id="ocr-enhanced-plate" src=""
-                                            style="width: 100%; height: 75px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                                            style="width: 100%; height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
                                     </div>
                                 </div>
                                 <div
@@ -772,10 +772,20 @@
                             </div>
                             <div><span class="label">Camera ID</span><span class="val" id="modal-camera-id">--</span>
                             </div>
-                            <div><span class="label">Detected Plate</span><span class="val monospace"
-                                    id="modal-plate-number">--</span></div>
+                            <div>
+                                <span class="label">Detected Plate</span>
+                                <div style="display: inline-flex; align-items: center; gap: 8px; vertical-align: middle;">
+                                    <span class="val monospace" id="modal-plate-number">--</span>
+                                    <input type="text" id="edit-plate-input" style="display: none; width: 140px; padding: 4px 8px; background: rgba(30, 41, 59, 0.9); border: 1px solid var(--accent-cyan); border-radius: 6px; color: #fff; font-family: monospace; font-size: 0.9rem;" />
+                                    <button id="edit-plate-btn" class="btn secondary" style="font-size: 0.65rem; padding: 2px 6px; width: auto; height: auto; margin: 0; display: inline-flex; align-items: center; gap: 2px;">✏️ Edit</button>
+                                    <button id="save-plate-btn" class="btn primary" style="display: none; font-size: 0.65rem; padding: 2px 6px; width: auto; height: auto; margin: 0;">💾 Save</button>
+                                    <button id="cancel-plate-btn" class="btn secondary" style="display: none; font-size: 0.65rem; padding: 2px 6px; width: auto; height: auto; margin: 0;">❌</button>
+                                </div>
+                            </div>
                             <div><span class="label">OCR Confidence</span><span class="val"
                                     id="modal-confidence">--</span></div>
+                            <div><span class="label">OCR Engine</span><span class="val"
+                                    id="modal-ocr-engine">--</span></div>
                             <div><span class="label">Fine Amount</span><span class="val text-danger"
                                     id="modal-fine-amount" style="font-weight: 700;">--</span></div>
                         </div>
@@ -793,6 +803,48 @@
                                 <button class="btn secondary btn-sm" id="modal-btn-watch-rec"
                                     style="width: auto; padding: 6px 12px; font-size: 0.8rem; margin-top: 8px;">📺 Watch
                                     Now</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dedicated License Plate OCR Debugger (Audit Panel) -->
+                    <div class="ocr-debug-panel glass" style="margin-top: 15px; padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px;">
+                        <h4 style="font-size: 0.95rem; font-weight: 700; color: #fff; margin: 0; display: flex; align-items: center; gap: 6px;">
+                            🔍 License Plate OCR Debugger
+                        </h4>
+                        <div style="display: flex; gap: 10px;">
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px;">Vehicle Crop</div>
+                                <img id="modal-ocr-vehicle-crop" src="" style="width: 100%; height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                            </div>
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px;">Plate Crop</div>
+                                <img id="modal-ocr-plate-crop" src="" style="width: 100%; height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                            </div>
+                            <div style="flex: 1; text-align: center;">
+                                <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px;">Enhanced Plate</div>
+                                <img id="modal-ocr-enhanced-plate" src="" style="width: 100%; height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-color); background: #020617;">
+                            </div>
+                        </div>
+                        
+                        <!-- Table of Alternative OCR Attempts -->
+                        <div>
+                            <h5 style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; margin-top: 0;">Alternative OCR Attempts Pool</h5>
+                            <div class="attempts-table-container" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.2);">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color); background: rgba(255,255,255,0.04);">
+                                            <th style="padding: 4px 6px; color: var(--text-muted); font-weight: 600;">Engine</th>
+                                            <th style="padding: 4px 6px; color: var(--text-muted); font-weight: 600;">Preprocessing</th>
+                                            <th style="padding: 4px 6px; color: var(--text-muted); font-weight: 600;">Raw Text</th>
+                                            <th style="padding: 4px 6px; color: var(--text-muted); font-weight: 600; text-align: right;">Conf</th>
+                                            <th style="padding: 4px 6px; color: var(--text-muted); font-weight: 600; text-align: center;">Regex</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="modal-ocr-attempts-body">
+                                        <!-- Populated dynamically -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

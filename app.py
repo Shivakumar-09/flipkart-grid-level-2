@@ -1,21 +1,63 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import csv
 import logging
 import json
 import uuid
 import warnings
 import numpy as np
-from datetime import datetime, timedelta, time
-from flask import Flask, request, jsonify, render_template, send_from_directory, Response
+import time
+from datetime import datetime, timedelta, time as time_type
+from functools import lru_cache, wraps
+from flask import Flask, request, jsonify, render_template, send_from_directory, Response, has_request_context
+from flask_compress import Compress
 from sqlalchemy import func
 from database.postgres import (
     SessionLocal, Vehicle, Violation, Challan, OCRResult,
     RepeatOffender, PoliceAlert, PatrolDispatch, Payment, SMSLog,
-    Analytics, SafetyVideoView, CameraNode
+    Analytics, SafetyVideoView, CameraNode, EvidencePackage
 )
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=UserWarning)
+
+# Cache decorator for API responses
+_cache_store = {}
+_cache_timestamps = {}
+
+def api_cache(timeout=300):
+    """Simple in-memory cache decorator for API endpoints, context-aware for background warming"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if has_request_context():
+                if request.args:
+                    sorted_args = sorted(request.args.items())
+                    cache_key = f"{f.__name__}_{sorted_args}"
+                else:
+                    cache_key = f"{f.__name__}_default"
+                
+                now = time.time()
+                hit = cache_key in _cache_store and cache_key in _cache_timestamps
+                if hit:
+                    valid = (now - _cache_timestamps[cache_key] < timeout)
+                    logger.info(f"CACHE CHECK: {cache_key} | Hit: {hit} | Valid: {valid}")
+                    if valid:
+                        return _cache_store[cache_key]
+                else:
+                    logger.info(f"CACHE CHECK: {cache_key} | Hit: False")
+            else:
+                cache_key = f"{f.__name__}_default"
+                logger.info(f"CACHE WARMING: Recalculating {cache_key}")
+            
+            # Recalculate/execute function
+            result = f(*args, **kwargs)
+            _cache_store[cache_key] = result
+            _cache_timestamps[cache_key] = time.time()
+            return result
+        return decorated_function
+    return decorator
 
 # Setup absolute project path
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -52,6 +94,9 @@ app = Flask(
     static_folder=STATIC_DIR,
     static_url_path='/static'
 )
+
+# Enable Gzip compression for faster responses
+Compress(app)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -201,6 +246,7 @@ def index():
 
 # API: Summary Metrics
 @app.route('/api/metrics', methods=['GET'])
+@api_cache(timeout=300)
 def get_metrics():
     if analytics_engine is None:
         return jsonify({"error": "Analytics Engine unavailable"}), 500
@@ -214,6 +260,7 @@ def get_stats():
 
 # API: Chart Metrics
 @app.route('/api/charts', methods=['GET'])
+@api_cache(timeout=300)
 def get_charts():
     if analytics_engine is None:
         return jsonify({"error": "Analytics Engine unavailable"}), 500
@@ -232,6 +279,7 @@ def get_charts():
 
 # API: City Analytics details
 @app.route('/api/analytics', methods=['GET'])
+@api_cache(timeout=300)
 def get_analytics_details():
     if analytics_engine is None:
         return jsonify({"error": "Analytics Engine unavailable"}), 500
@@ -256,6 +304,7 @@ def get_analytics_details():
 
 # API: Model Evaluation details
 @app.route('/api/evaluation', methods=['GET'])
+@api_cache(timeout=300)
 def get_evaluation_details():
     try:
         from evaluation.metrics import calculate_metrics
@@ -266,6 +315,7 @@ def get_evaluation_details():
 
 # API: Traffic Command Center details (Phase 1, 2, 3, 4, 10, 11)
 @app.route('/api/command_center', methods=['GET'])
+@api_cache(timeout=300)
 def get_command_center():
     if analytics_engine is None:
         return jsonify({"error": "Analytics Engine unavailable"}), 500
@@ -348,6 +398,7 @@ def get_command_center():
 
 # API: Detailed Chart Statistics (Phase 5, 6 & 7)
 @app.route('/api/detailed_charts', methods=['GET'])
+@api_cache(timeout=300)
 def get_detailed_charts():
     if analytics_engine is None:
         return jsonify({"error": "Analytics Engine unavailable"}), 500
@@ -371,23 +422,49 @@ def get_detailed_charts():
 # API: Violation logs list - updated for new database schema and UI table format
 
 @app.route('/api/logs', methods=['GET'])
+@api_cache(timeout=300)
 def get_logs():
     session = SessionLocal()
     try:
+        # Use limit to reduce dataset size
+        if has_request_context():
+            limit = min(int(request.args.get('limit', 100)), 500)
+        else:
+            limit = 100
+        
         results = session.query(
-            Violation, Vehicle, Challan, OCRResult
+            Violation, Vehicle, Challan, OCRResult, EvidencePackage
         ).join(
             Vehicle, Violation.vehicle_id == Vehicle.id, isouter=True
         ).join(
             Challan, Violation.id == Challan.violation_id, isouter=True
         ).join(
             OCRResult, Violation.id == OCRResult.violation_id, isouter=True
+        ).join(
+            EvidencePackage, Violation.id == EvidencePackage.violation_id, isouter=True
         ).order_by(
             Violation.timestamp.desc()
-        ).all()
+        ).limit(limit).all()
         
         logs = []
-        for violation, vehicle, challan, ocr_result in results:
+        for violation, vehicle, challan, ocr_result, evidence_package in results:
+            attempts = []
+            vehicle_crop_path = f"{violation.evidence_path}/vehicle_crop.jpg"
+            if evidence_package:
+                if evidence_package.ocr_results:
+                    try:
+                        ocr_res_data = json.loads(evidence_package.ocr_results)
+                        attempts = ocr_res_data.get("attempts", [])
+                    except Exception:
+                        pass
+                if evidence_package.image_paths:
+                    try:
+                        img_paths = json.loads(evidence_package.image_paths)
+                        if img_paths.get("vehicle_crop"):
+                            vehicle_crop_path = img_paths["vehicle_crop"]
+                    except Exception:
+                        pass
+
             d = {
                 "id": violation.id,
                 "violation_id": violation.id,
@@ -409,12 +486,13 @@ def get_logs():
                 "plate_crop_path": ocr_result.plate_crop_path if ocr_result else "",
                 "enhanced_plate_path": ocr_result.enhanced_plate_path if ocr_result else "",
                 "ocr_result_path": ocr_result.ocr_result_path if ocr_result else "",
+                "ocr_attempts": attempts,
                 
                 "ocr_debug_paths": {
                     "plate_crop": ocr_result.plate_crop_path if ocr_result else "",
                     "enhanced_plate": ocr_result.enhanced_plate_path if ocr_result else "",
                     "ocr_result": ocr_result.ocr_result_path if ocr_result else "",
-                    "vehicle_crop": f"{violation.evidence_path}/original.jpg"
+                    "vehicle_crop": vehicle_crop_path
                 }
             }
             logs.append(d)
@@ -429,6 +507,8 @@ def get_logs():
 @app.route('/api/upload', methods=['POST'])
 def upload_frame():
     print("UPLOAD RECEIVED")
+    _cache_store.clear()
+    _cache_timestamps.clear()
     import time
     if violation_engine is None or evidence_engine is None:
         return jsonify({"error": "AI Inference engines are offline or loading"}), 503
@@ -617,8 +697,8 @@ def upload_frame():
             # 2. Check Congestion Alert (Patrol dispatch)
             try:
                 session = SessionLocal()
-                today_start = datetime.combine(datetime.now().date(), time.min)
-                today_end = datetime.combine(datetime.now().date(), time.max)
+                today_start = datetime.combine(datetime.now().date(), datetime.min.time())
+                today_end = datetime.combine(datetime.now().date(), datetime.max.time())
                 loc_violations_today = session.query(Violation).filter(
                     Violation.location == location,
                     Violation.timestamp >= today_start,
@@ -846,6 +926,22 @@ def get_rules():
             "fine": 5000,
             "imprisonment": "Up to 6 months imprisonment for first offense",
             "recommendation": "Always follow the lane direction markings. Do not drive on the wrong side to save fuel or take a short-cut."
+        },
+        "RED_LIGHT_VIOLATION": {
+            "title": "Red-Light Violation Rule",
+            "section": "Section 119/177, Indian Motor Vehicles Act",
+            "description": "No driver shall cross the stop-line or enter the intersection when the traffic signal displays a red light. Violations carry a fine of ₹1,000 to ₹5,000 or imprisonment up to 6 months, or both.",
+            "fine": 10000,
+            "imprisonment": "Up to 6 months for repeated offenses",
+            "recommendation": "Always stop before the white stop-line when the signal turns red. Do not accelerate during yellow — it means prepare to stop, not speed up."
+        },
+        "STOP_LINE_VIOLATION": {
+            "title": "Stop-Line Violation Rule",
+            "section": "Section 119/177, Indian Motor Vehicles Act",
+            "description": "Drivers must stop before the marked stop line at controlled junctions and pedestrian crossings. Crossing the line blocks pedestrians and creates collision risk at the intersection mouth.",
+            "fine": 1000,
+            "imprisonment": "Escalation for repeated dangerous driving offenses",
+            "recommendation": "Keep the front bumper behind the white stop line until the signal and crossing are clear."
         }
     }
     return jsonify(rules)
@@ -1177,6 +1273,132 @@ def pay_challan():
         logger.error(f"Failed to pay challan: {e}")
         return jsonify({"error": str(e)}), 500
 
+# API: Update/Correct License Plate Registration
+@app.route('/api/challan/<challan_id>/update_plate', methods=['POST'])
+def update_challan_plate(challan_id):
+    try:
+        data = request.json or {}
+        new_plate = data.get("plate_number")
+        if not new_plate:
+            return jsonify({"error": "Missing plate_number"}), 400
+        
+        new_plate = new_plate.strip().upper()
+        if not new_plate:
+            return jsonify({"error": "Invalid plate_number"}), 400
+            
+        session = SessionLocal()
+        challan_record = session.query(Challan).filter_by(challan_id=challan_id).first()
+        if not challan_record:
+            session.close()
+            return jsonify({"error": "Challan not found"}), 404
+            
+        violation = session.query(Violation).filter_by(id=challan_record.violation_id).first()
+        if not violation:
+            session.close()
+            return jsonify({"error": "Associated violation not found"}), 404
+            
+        old_vehicle = violation.vehicle
+        old_plate = old_vehicle.plate_number if old_vehicle else None
+
+        # Find or create Vehicle
+        vehicle = session.query(Vehicle).filter_by(plate_number=new_plate).first()
+        if not vehicle:
+            contact = VEHICLE_CONTACTS.get(new_plate, VEHICLE_CONTACTS.get("DEFAULT", {}))
+            vehicle = Vehicle(
+                plate_number=new_plate,
+                owner_name=contact.get("name", "Vehicle Owner"),
+                owner_phone=contact.get("phone", "+919876543210")
+            )
+            session.add(vehicle)
+            session.flush() # Get vehicle.id
+            
+        # Update violation vehicle association
+        violation.vehicle_id = vehicle.id
+        
+        # Update RepeatOffender table for the new plate
+        new_count = session.query(Violation).filter_by(vehicle_id=vehicle.id).count()
+        latest_violation = session.query(Violation).filter_by(vehicle_id=vehicle.id).order_by(Violation.timestamp.desc()).first()
+        latest_v_type = latest_violation.violation_type if latest_violation else "VIOLATION"
+        
+        offender = session.query(RepeatOffender).filter_by(plate_number=new_plate).first()
+        if offender:
+            offender.violations_count = new_count
+            offender.last_violation = latest_v_type
+            offender.blacklist_status = "BLACKLISTED" if new_count >= 3 else "WARNING"
+        else:
+            offender = RepeatOffender(
+                plate_number=new_plate,
+                violations_count=new_count,
+                last_violation=latest_v_type,
+                blacklist_status="WARNING"
+            )
+            session.add(offender)
+
+        # Update RepeatOffender table for the old plate (if any)
+        if old_vehicle and old_plate and old_plate != new_plate:
+            old_count = session.query(Violation).filter_by(vehicle_id=old_vehicle.id).count()
+            old_offender = session.query(RepeatOffender).filter_by(plate_number=old_plate).first()
+            if old_offender:
+                if old_count == 0:
+                    session.delete(old_offender)
+                else:
+                    latest_old_violation = session.query(Violation).filter_by(vehicle_id=old_vehicle.id).order_by(Violation.timestamp.desc()).first()
+                    latest_old_v_type = latest_old_violation.violation_type if latest_old_violation else "VIOLATION"
+                    old_offender.violations_count = old_count
+                    old_offender.last_violation = latest_old_v_type
+                    old_offender.blacklist_status = "BLACKLISTED" if old_count >= 3 else "WARNING"
+
+        # Update EvidencePackage table
+        evidence_pkg = session.query(EvidencePackage).filter_by(violation_id=violation.id).first()
+        if evidence_pkg:
+            try:
+                ocr_results = json.loads(evidence_pkg.ocr_results)
+                ocr_results["plate_number"] = new_plate
+                evidence_pkg.ocr_results = json.dumps(ocr_results)
+            except Exception as ocr_err:
+                logger.error(f"Failed to update EvidencePackage ocr_results: {ocr_err}")
+                
+        session.commit()
+        session.close()
+        
+        # Clear API caches so dashboard updates instantly
+        _cache_store.clear()
+        _cache_timestamps.clear()
+
+        # Update challan.json file on disk
+        package_dir = os.path.join(OUTPUTS_DIR, "evidence", violation.id)
+        json_path = os.path.join(package_dir, "challan.json")
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    challan_json = json.load(f)
+                challan_json["plate_number"] = new_plate
+                with open(json_path, 'w') as f:
+                    json.dump(challan_json, f, indent=4)
+            except Exception as file_err:
+                logger.error(f"Failed to update challan.json on disk: {file_err}")
+                
+        # Regenerate PDF challan on disk
+        pdf_path = os.path.join(PROJECT_ROOT, "challans", f"{challan_id}.pdf")
+        if evidence_engine and os.path.exists(json_path):
+            try:
+                with open(json_path, 'r') as f:
+                    updated_json = json.load(f)
+                pdf_evidence_img = os.path.join(package_dir, "annotated.jpg")
+                evidence_engine._generate_pdf(challan_id, updated_json, pdf_evidence_img, pdf_path)
+            except Exception as pdf_err:
+                logger.error(f"Failed to regenerate PDF Challan: {pdf_err}")
+                
+        return jsonify({
+            "status": "success",
+            "message": "Plate number updated successfully",
+            "plate_number": new_plate
+        })
+    except Exception as e:
+        logger.error(f"Failed to update plate number: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # API: Dispatch Patrol Unit (simulates dispatch alerts and Twilio notifications)
 @app.route('/api/dispatch', methods=['POST'])
 def dispatch_patrol():
@@ -1234,6 +1456,7 @@ def dispatch_patrol():
 
 # API: Repeat Offender Analytics (Phase 6)
 @app.route('/api/repeat_offenders', methods=['GET'])
+@api_cache(timeout=300)
 def get_repeat_offenders_api():
     if analytics_engine is None:
         return jsonify({"error": "Analytics Engine unavailable"}), 500
@@ -1246,6 +1469,7 @@ def get_repeat_offenders_api():
 
 # API: Active Deployed Patrols Board (Phase 7 — shows dispatched officer locations)
 @app.route('/api/deployed_patrols', methods=['GET'])
+@api_cache(timeout=300)
 def get_deployed_patrols():
     session = SessionLocal()
     try:
@@ -1271,6 +1495,7 @@ def get_deployed_patrols():
 
 # API: Police patrol deployment recommendation engine
 @app.route('/api/recommendations', methods=['GET'])
+@api_cache(timeout=300)
 def get_recommendations():
     if analytics_engine is None:
         return jsonify({"error": "Analytics Engine unavailable"}), 500
@@ -1330,6 +1555,7 @@ def get_predictions():
         future_time = now + timedelta(hours=i)
         hour_str = future_time.strftime("%H:00")
         hour = future_time.hour
+        risk_factors = ["HELMET_VIOLATION", "WRONG_SIDE_DRIVING", "STOP_LINE_VIOLATION"]
         
         # Deterministic simulation peaking around rush hours (9 AM & 6 PM)
         dist_9 = abs(hour - 9)
@@ -1342,7 +1568,7 @@ def get_predictions():
             "time": hour_str,
             "violation_probability": round(max(0.05, min(0.95, base_prob)), 2),
             "congestion_index": max(10, min(100, congestion_idx)),
-            "primary_risk_factor": "HELMET_VIOLATION" if hour % 2 == 0 else "WRONG_SIDE_DRIVING"
+            "primary_risk_factor": risk_factors[hour % len(risk_factors)]
         })
         
     return jsonify({
@@ -1381,6 +1607,10 @@ def ai_assistant():
         elif "helmet" in query:
             cnt = session.query(Violation).filter_by(violation_type='HELMET_VIOLATION').count()
             response_text = f"Our AI models have detected **{cnt} Helmet Violations** across all monitored intersections."
+
+        elif "stop line" in query or "stop-line" in query or "stopline" in query:
+            cnt = session.query(Violation).filter_by(violation_type='STOP_LINE_VIOLATION').count()
+            response_text = f"Our AI models have detected **{cnt} Stop-Line Violations** across all monitored intersections."
             
         elif "silk" in query or "board" in query:
             cnt = session.query(Violation).filter(Violation.location.like('%Silk Board%')).count()
@@ -1420,6 +1650,46 @@ def ai_assistant():
         logger.error(f"Error in AI assistant query processing: {e}")
         return jsonify({"response": f"Error running query helper: {str(e)}"})
 
+import threading
+import time
+
+def start_cache_warming_thread(app_instance):
+    def run_warming():
+        logger.info("Background cache warming thread started.")
+        # Wait 3 seconds to let Flask server bind and initialize completely
+        time.sleep(3)
+        
+        while True:
+            try:
+                with app_instance.app_context():
+                    logger.info("Warming API caches from PostgreSQL database...")
+                    t0 = time.time()
+                    
+                    # Force executes and caches Flask GET handlers under app_context
+                    get_metrics()
+                    get_charts()
+                    get_analytics_details()
+                    get_command_center()
+                    get_detailed_charts()
+                    get_logs()
+                    get_repeat_offenders_api()
+                    get_deployed_patrols()
+                    get_recommendations()
+                    get_evaluation_details()
+                    
+                    logger.info(f"API caches warmed successfully in {time.time() - t0:.2f} seconds.")
+            except Exception as e:
+                logger.error(f"Error in background cache warming: {e}")
+            
+            # Refresh every 30 seconds
+            time.sleep(30)
+            
+    t = threading.Thread(target=run_warming, daemon=True)
+    t.start()
+
 if __name__ == '__main__':
+    # Start cache warming thread
+    start_cache_warming_thread(app)
     # Initialize port and host for developer binding, disable reloader to avoid conflict when writing evidence files
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)

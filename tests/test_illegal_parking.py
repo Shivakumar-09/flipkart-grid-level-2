@@ -10,6 +10,7 @@ import numpy as np
 
 # Ensure project root is in the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.parking_detector import ParkingDetector
 

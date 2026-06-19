@@ -4,14 +4,15 @@ import subprocess
 import time
 from datetime import datetime
 
-# Ensure project root is in the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.postgres import SessionLocal, initialize_database, Violation, Challan, Vehicle, RepeatOffender, PoliceAlert
 
 def run_cmd(cmd):
     try:
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+        tests_dir = os.path.dirname(os.path.abspath(__file__))
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=120, cwd=tests_dir)
         return res.returncode == 0, res.stdout, res.stderr
     except subprocess.TimeoutExpired:
         return False, "", "TIMEOUT"
@@ -40,6 +41,34 @@ def run_health_check():
         print(f"  Illegal Parking tests: FAIL — {park_err}")
         report_lines.append("## 🚧 Illegal Parking Detection: **FAIL**")
         report_lines.append(f"Error: {park_err or park_out}\n")
+        
+    # 1b. Run test_seatbelt_detection.py
+    print("Running Seatbelt Detection tests...")
+    sb_ok, sb_out, sb_err = run_cmd("python test_seatbelt_detection.py")
+    if sb_ok:
+        print("  Seatbelt Detection tests: PASS")
+        report_lines.append("## 🚗 Seatbelt Detection: **PASS**")
+        report_lines.append("```")
+        report_lines.append(sb_out.strip())
+        report_lines.append("```\n")
+    else:
+        print(f"  Seatbelt Detection tests: FAIL — {sb_err}")
+        report_lines.append("## 🚗 Seatbelt Detection: **FAIL**")
+        report_lines.append(f"Error: {sb_err or sb_out}\n")
+
+    # 1c. Run test_stopline_detection.py
+    print("Running Stop-Line Detection tests...")
+    sl_ok, sl_out, sl_err = run_cmd("python test_stopline_detection.py")
+    if sl_ok:
+        print("  Stop-Line Detection tests: PASS")
+        report_lines.append("## 🛑 Stop-Line Detection: **PASS**")
+        report_lines.append("```")
+        report_lines.append(sl_out.strip())
+        report_lines.append("```\n")
+    else:
+        print(f"  Stop-Line Detection tests: FAIL — {sl_err}")
+        report_lines.append("## 🛑 Stop-Line Detection: **FAIL**")
+        report_lines.append(f"Error: {sl_err or sl_out}\n")
         
     # 2. Run test_pipeline.py
     print("Running Pipeline validation suite...")
@@ -116,6 +145,12 @@ def run_health_check():
     proj_root = os.path.dirname(os.path.abspath(__file__))
     health_report_path = os.path.join(proj_root, "TRAFFICFLOW_FINAL_HEALTH_REPORT.md")
     with open(health_report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(report_lines))
+        
+    # Also write to docs/reports/ for final packaging/cleanup compliance
+    docs_report_path = os.path.join(os.path.dirname(proj_root), "docs", "reports", "TRAFFICFLOW_FINAL_HEALTH_REPORT.md")
+    os.makedirs(os.path.dirname(docs_report_path), exist_ok=True)
+    with open(docs_report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines))
         
     print(f"Health check completed. Overall readiness: {overall_readiness:.2f}/100. Report generated.")

@@ -4,10 +4,30 @@ import re
 import logging
 import shutil
 import numpy as np
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dotenv import load_dotenv
+
+# Ensure environment variables are loaded from root .env
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+
+# Import pytesseract for multi-engine voting
+try:
+    import pytesseract
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+except ImportError:
+    pass
+
+from utils.runtime import get_runtime_device, get_yolo_model
 
 logger = logging.getLogger("OcrEngine")
 
 YOLOV8_ALPR_REPO = "Muhammad-Zeerak-Khan/Automatic-License-Plate-Recognition-using-YOLOv8"
+_OCR_CACHE_LOCK = threading.Lock()
+_EASY_READER_CACHE = {}
+_PADDLE_READER_CACHE = {}
 
 
 class OcrEngine:
@@ -22,6 +42,8 @@ class OcrEngine:
     def __init__(self):
         self.easy_reader = None
         self.paddle_reader = None
+        self.tesseract_loaded = False
+        self.tesseract_error = ""
         self.easy_loaded = False
         self.paddle_loaded = False
         self.plate_model = None
@@ -30,6 +52,11 @@ class OcrEngine:
         self.plate_model_error = ""
         self.paddle_error = ""
         self.last_debug = {}
+        self.device = get_runtime_device()
+        self.use_gpu = self.device != "cpu"
+        self.debug_enabled = os.environ.get("TRAFFICFLOW_OCR_DEBUG", "1") != "0"
+        self.parallel_ocr = os.environ.get("TRAFFICFLOW_PARALLEL_OCR", "1") != "0"
+        self.high_confidence_cutoff = float(os.environ.get("TRAFFICFLOW_OCR_SKIP_FALLBACK_CONF", "0.82"))
 
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.outputs_dir = os.path.join(self.project_root, "outputs")
@@ -39,40 +66,75 @@ class OcrEngine:
         os.makedirs(self.debug_dir, exist_ok=True)
         os.makedirs(self.outputs_debug_dir, exist_ok=True)
 
+        self._load_easyocr_reader()
+        self._load_paddleocr_reader()
+        self._load_tesseract()
+
+        self._load_plate_detector()
+
+    def _load_easyocr_reader(self):
         try:
             import easyocr
             import warnings
-            # Suppress easyocr CPU usage warning and other logs
             logging.getLogger('easyocr').setLevel(logging.ERROR)
             warnings.filterwarnings("ignore", category=UserWarning)
-            self.easy_reader = easyocr.Reader(["en"], gpu=False)
+            key = ("en", bool(self.use_gpu))
+            with _OCR_CACHE_LOCK:
+                if key not in _EASY_READER_CACHE:
+                    _EASY_READER_CACHE[key] = easyocr.Reader(["en"], gpu=self.use_gpu)
+                self.easy_reader = _EASY_READER_CACHE[key]
             self.easy_loaded = True
-            logger.info("EasyOCR engine initialized successfully.")
+            logger.info(f"EasyOCR engine ready on {'GPU' if self.use_gpu else 'CPU'} from cache.")
         except Exception as e:
             logger.warning(f"Could not load EasyOCR: {e}. EasyOCR attempts disabled.")
 
+    def _load_paddleocr_reader(self):
         try:
             from paddleocr import PaddleOCR
-            try:
-                self.paddle_reader = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
-            except TypeError:
-                self.paddle_reader = PaddleOCR(use_angle_cls=True, lang="en")
+            key = ("en", bool(self.use_gpu))
+            with _OCR_CACHE_LOCK:
+                if key not in _PADDLE_READER_CACHE:
+                    try:
+                        _PADDLE_READER_CACHE[key] = PaddleOCR(
+                            use_angle_cls=True,
+                            lang="en",
+                            show_log=False,
+                            use_gpu=self.use_gpu
+                        )
+                    except TypeError:
+                        try:
+                            _PADDLE_READER_CACHE[key] = PaddleOCR(
+                                use_angle_cls=True,
+                                lang="en",
+                                use_gpu=self.use_gpu
+                            )
+                        except TypeError:
+                            _PADDLE_READER_CACHE[key] = PaddleOCR(use_angle_cls=True, lang="en")
+                self.paddle_reader = _PADDLE_READER_CACHE[key]
             self.paddle_loaded = True
-            logger.info("PaddleOCR engine initialized successfully.")
+            logger.info(f"PaddleOCR engine ready on {'GPU' if self.use_gpu else 'CPU'} from cache.")
         except Exception as e:
             self.paddle_error = str(e)
             logger.info(f"Could not load PaddleOCR: {e}. PaddleOCR attempts disabled.")
 
-        self._load_plate_detector()
+    def _load_tesseract(self):
+        try:
+            import pytesseract
+            tess_exe = pytesseract.pytesseract.tesseract_cmd
+            if os.path.exists(tess_exe):
+                pytesseract.get_tesseract_version()
+                self.tesseract_loaded = True
+                logger.info("Tesseract OCR engine ready.")
+            else:
+                self.tesseract_error = f"Tesseract executable not found at {tess_exe}"
+                self.tesseract_loaded = False
+                logger.warning(self.tesseract_error)
+        except Exception as e:
+            self.tesseract_error = str(e)
+            self.tesseract_loaded = False
+            logger.warning(f"Could not load Tesseract OCR: {e}")
 
     def _load_plate_detector(self):
-        try:
-            from ultralytics import YOLO
-        except Exception as e:
-            self.plate_model_error = f"ultralytics import failed: {e}"
-            logger.error(self.plate_model_error)
-            return
-
         detector_candidates = [
             (
                 "license_plate_detector.pt",
@@ -91,11 +153,12 @@ class OcrEngine:
                 errors.append(f"{filename}: missing")
                 continue
             try:
-                self.plate_model = YOLO(plate_model_path)
+                self.plate_model, self.device, load_ms, from_cache = get_yolo_model(plate_model_path)
                 self.plate_model_path = plate_model_path
                 self.plate_model_source = source
                 self.plate_model_error = ""
-                logger.info(f"YOLOv8 license plate model loaded from {filename} ({source}).")
+                cache_msg = "cache" if from_cache else f"{load_ms:.1f}ms"
+                logger.info(f"YOLOv8 license plate model ready from {filename} ({source}) on {self.device} ({cache_msg}).")
                 return
             except Exception as e:
                 errors.append(f"{filename}: {e}")
@@ -117,6 +180,7 @@ class OcrEngine:
         Vehicle -> plate localization -> enhancement -> EasyOCR/PaddleOCR comparison.
         Returns (plate_text, confidence, cropped_plate, diagnostics).
         """
+        total_started = time.perf_counter()
         diagnostics = self._new_diagnostics(image, vehicle_box)
         run_debug_dir, run_outputs_debug_dir = self._prepare_debug_dirs(debug_name)
 
@@ -145,7 +209,9 @@ class OcrEngine:
         diagnostics["vehicle_crop_dimensions"] = self._dimensions(vehicle_crop)
         self._save_debug_image("vehicle_crop.jpg", vehicle_crop, run_debug_dir, run_outputs_debug_dir)
 
+        plate_started = time.perf_counter()
         candidates = self._detect_plate_candidates(vehicle_crop)
+        diagnostics["profile"]["plate_detection_ms"] = round((time.perf_counter() - plate_started) * 1000, 2)
         diagnostics["plate_candidates"] = [
             {
                 "box": item["box"],
@@ -163,7 +229,9 @@ class OcrEngine:
                 for item in candidates
             ]
 
+        ocr_started = time.perf_counter()
         best = self._evaluate_plate_candidates(vehicle_crop, candidates)
+        diagnostics["profile"]["ocr_recognition_ms"] = round((time.perf_counter() - ocr_started) * 1000, 2)
 
         if best["crop"] is not None and best["crop"].size > 0:
             self._save_debug_image("plate_crop.jpg", best["crop"], run_debug_dir, run_outputs_debug_dir)
@@ -207,6 +275,19 @@ class OcrEngine:
 
         diagnostics["selected_text"] = selected_text
         diagnostics["selected_confidence"] = selected_confidence
+        diagnostics["profile"]["total_ocr_pipeline_ms"] = round((time.perf_counter() - total_started) * 1000, 2)
+        
+        # Structured Pipeline Trace logging
+        logger.info("=== OCR Pipeline Trace ===")
+        logger.info(f"1. Image dimensions: {diagnostics.get('original_dimensions')}")
+        logger.info(f"2. Vehicle Box: {diagnostics.get('vehicle_box')} | Crop Size: {diagnostics.get('vehicle_crop_dimensions')}")
+        logger.info(f"3. Plate Detection Box: {diagnostics.get('plate_box')} | Conf: {diagnostics.get('plate_detection_confidence')} | Time: {diagnostics['profile']['plate_detection_ms']} ms")
+        logger.info(f"4. Plate Crop Dimensions: {diagnostics.get('plate_dimensions')}")
+        logger.info(f"5. Enhanced Plate Dimensions: {diagnostics.get('enhanced_dimensions')}")
+        logger.info(f"6. OCR Engine: {diagnostics.get('ocr_engine')} | Text: {diagnostics.get('raw_text')} | Conf: {diagnostics.get('ocr_confidence')} | Time: {diagnostics['profile']['ocr_recognition_ms']} ms")
+        logger.info(f"7. Regex Validation: {'PASS' if diagnostics.get('failure_reason') == 'accepted' else 'FAIL'} | Reason: {diagnostics.get('failure_reason')}")
+        logger.info(f"8. Final Output: {diagnostics.get('selected_text')} | Confidence: {diagnostics.get('selected_confidence')} | Total Time: {diagnostics['profile']['total_ocr_pipeline_ms']} ms")
+        
         self.last_debug = diagnostics
         return selected_text, selected_confidence, best.get("crop"), diagnostics
 
@@ -225,7 +306,8 @@ class OcrEngine:
             "ocr_engine": "none",
             "ocr_engines": {
                 "easyocr": {"available": self.easy_loaded},
-                "paddleocr": {"available": self.paddle_loaded, "error": self.paddle_error}
+                "paddleocr": {"available": self.paddle_loaded, "error": self.paddle_error},
+                "tesseract": {"available": self.tesseract_loaded, "error": self.tesseract_error}
             },
             "ocr_attempts": [],
             "raw_text": "",
@@ -236,7 +318,12 @@ class OcrEngine:
             "plate_model_error": self.plate_model_error,
             "plate_model_path": self.plate_model_path,
             "plate_model_source": self.plate_model_source,
-            "debug_paths": self._debug_paths(None)
+            "debug_paths": self._debug_paths(None),
+            "profile": {
+                "plate_detection_ms": 0.0,
+                "ocr_recognition_ms": 0.0,
+                "total_ocr_pipeline_ms": 0.0
+            }
         }
 
     def _prepare_debug_dirs(self, debug_name):
@@ -268,6 +355,8 @@ class OcrEngine:
         }
 
     def _save_debug_image(self, filename, image, debug_dir=None, outputs_debug_dir=None):
+        if not self.debug_enabled:
+            return
         if image is None or image.size == 0:
             return
 
@@ -295,7 +384,7 @@ class OcrEngine:
             return None
         return [x1, y1, x2, y2]
 
-    def _crop_with_padding(self, image, box, padding_ratio=0.08):
+    def _crop_with_padding(self, image, box, padding_ratio=0.15):
         h, w = image.shape[:2]
         x1, y1, x2, y2 = box
         pad_x = int((x2 - x1) * padding_ratio)
@@ -319,7 +408,7 @@ class OcrEngine:
             return candidates
 
         try:
-            results = self.plate_model(vehicle_crop, verbose=False)
+            results = self.plate_model(vehicle_crop, verbose=False, device=self.device)
             if not results:
                 return candidates
             for box in results[0].boxes:
@@ -599,9 +688,9 @@ class OcrEngine:
             "attempts": []
         }
 
-        if not self.easy_loaded and not self.paddle_loaded:
+        if not self.easy_loaded and not self.paddle_loaded and not self.tesseract_loaded:
             if candidates:
-                crop = self._crop_with_padding(vehicle_crop, candidates[0]["box"], candidates[0].get("padding", 0.04))
+                crop = self._crop_with_padding(vehicle_crop, candidates[0]["box"], candidates[0].get("padding", 0.15))
                 best.update({
                     "box": candidates[0]["box"],
                     "source": candidates[0]["source"],
@@ -611,92 +700,87 @@ class OcrEngine:
                 })
             return best
 
-        # Fast Pass: Evaluate the top 3 candidates using only 3 primary variants.
-        # This keeps the execution time under 5-10 seconds for clear images.
-        for candidate in candidates[:3]:
-            crop = self._crop_with_padding(vehicle_crop, candidate["box"], candidate.get("padding", 0.06))
+        all_attempts = []
+        ocr_start_time = time.perf_counter()
+        
+        for idx, candidate in enumerate(candidates[:3]):
+            if time.perf_counter() - ocr_start_time >= 2.5:
+                logger.info("OCR global candidates evaluation timeout reached. Stopping candidate search.")
+                break
+                
+            crop = self._crop_with_padding(vehicle_crop, candidate["box"], candidate.get("padding", 0.15))
             if crop is None or crop.size == 0:
                 continue
+                
+            # Perform strict coordinates/size rejection (rejects non-standard crops)
+            h_c, w_c = crop.shape[:2]
+            aspect_ratio = w_c / float(max(h_c, 1))
+            if w_c < 30 or h_c < 15 or not (0.45 <= aspect_ratio <= 5.8):
+                logger.info(f"Rejected crop due to size/ratio check: {w_c}x{h_c}, aspect={aspect_ratio:.2f}")
+                continue
 
-            corrected_crop = self._perspective_correct(crop)
-            corrected = self._upscale_if_needed(corrected_crop)
-            gray = cv2.cvtColor(corrected, cv2.COLOR_BGR2GRAY) if len(corrected.shape) == 3 else corrected
-            gray = cv2.copyMakeBorder(gray, 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=255)
-            color_padded = cv2.copyMakeBorder(corrected, 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=(255, 255, 255))
+            variants, enhanced = self._get_ocr_v3_variants(crop)
             
-            clahe = cv2.createCLAHE(clipLimit=2.8, tileGridSize=(8, 8)).apply(gray)
-            denoised = cv2.bilateralFilter(clahe, 7, 50, 50)
-            sharp_kernel = np.array([[0, -1, 0], [-1, 5.4, -1], [0, -1, 0]], dtype=np.float32)
-            sharpened = cv2.filter2D(denoised, -1, sharp_kernel)
-            contrast = cv2.convertScaleAbs(sharpened, alpha=1.22, beta=8)
+            # Fast pass: Only run OCR on top 3 variants for lower-rank candidates, or all 8 for top candidate
+            if idx == 0:
+                candidate_variants = variants
+            else:
+                candidate_variants = [v for v in variants if v["name"] in ["original", "adaptive_threshold", "super_resolution"]]
+                
+            candidate_attempts = self._run_ocr_attempts(candidate_variants, ocr_start_time)
             
-            block = max(21, (min(contrast.shape[:2]) // 6) * 2 + 1)
-            adaptive = cv2.adaptiveThreshold(contrast, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, block, 9)
-            adaptive = self._ensure_dark_text_on_light(adaptive)
-            
-            primary_variants = [
-                {"name": "original_crop", "image": color_padded},
-                {"name": "contrast_enhanced", "image": contrast},
-                {"name": "adaptive_threshold", "image": adaptive},
-            ]
-            
-            candidate_attempts = self._run_ocr_attempts(primary_variants)
-
+            # Record attempts with coordinates context
             for attempt in candidate_attempts:
-                candidate_rank = self._candidate_rank(attempt["text"], attempt["confidence"])
-                candidate_rank += min(float(candidate.get("score", 0.0)) / 12.0, 0.7)
-                if candidate_rank > best["rank"]:
+                attempt["box"] = candidate["box"]
+                attempt["source"] = candidate["source"]
+                attempt["plate_confidence"] = candidate.get("confidence", 0.0)
+                attempt["crop"] = crop
+                attempt["enhanced"] = enhanced
+                all_attempts.append(attempt)
+                
+            # Early Exit verification (if top candidate already yielded high conf Indian plate)
+            winning_candidate = self._perform_voting_system(all_attempts)
+            if winning_candidate:
+                best_data = winning_candidate["data"]
+                best_attempt = best_data["best_attempt"]
+                
+                if best_attempt["valid"] and best_attempt["confidence"] >= self.high_confidence_cutoff:
                     best.update({
-                        "text": attempt["text"],
-                        "raw_text": attempt["raw_text"],
-                        "confidence": attempt["confidence"],
-                        "rank": candidate_rank,
-                        "engine": attempt["engine"],
-                        "variant": attempt["variant"],
-                        "box": candidate["box"],
-                        "source": candidate["source"],
-                        "plate_confidence": candidate.get("confidence", 0.0),
-                        "crop": corrected_crop,
-                        "enhanced": adaptive,
+                        "text": best_attempt["text"],
+                        "raw_text": best_attempt["raw_text"],
+                        "confidence": best_attempt["confidence"],
+                        "rank": winning_candidate["score"],
+                        "engine": best_attempt["engine"],
+                        "variant": best_attempt["variant"],
+                        "box": best_attempt["box"],
+                        "source": best_attempt["source"],
+                        "plate_confidence": best_attempt["plate_confidence"],
+                        "crop": best_attempt["crop"],
+                        "enhanced": best_attempt["enhanced"],
                     })
+                    break
 
-            best["attempts"].extend(candidate_attempts[:12])
-
-            if self._is_valid_plate(best["text"]) and best["confidence"] >= 0.70:
-                break
-
-        # Comprehensive Fallback Pass: Only if no valid license plate with high confidence was found
-        # in the fast pass, run the full 15 variants check ONLY on the best candidate (candidates[0]).
-        if (not self._is_valid_plate(best["text"]) or best["confidence"] < 0.70) and candidates:
-            candidate = candidates[0]
-            crop = self._crop_with_padding(vehicle_crop, candidate["box"], candidate.get("padding", 0.06))
-            if crop is not None and crop.size > 0:
-                corrected_crop = self._perspective_correct(crop)
-                variants, enhanced = self._build_ocr_inputs(corrected_crop)
-                candidate_attempts = self._run_ocr_attempts(variants)
-
-                for attempt in candidate_attempts:
-                    candidate_rank = self._candidate_rank(attempt["text"], attempt["confidence"])
-                    candidate_rank += min(float(candidate.get("score", 0.0)) / 12.0, 0.7)
-                    if candidate_rank > best["rank"]:
-                        best.update({
-                            "text": attempt["text"],
-                            "raw_text": attempt["raw_text"],
-                            "confidence": attempt["confidence"],
-                            "rank": candidate_rank,
-                            "engine": attempt["engine"],
-                            "variant": attempt["variant"],
-                            "box": candidate["box"],
-                            "source": candidate["source"],
-                            "plate_confidence": candidate.get("confidence", 0.0),
-                            "crop": corrected_crop,
-                            "enhanced": enhanced,
-                        })
-
-                best["attempts"].extend(candidate_attempts[:12])
+        # Final voting pool selection
+        winning_candidate = self._perform_voting_system(all_attempts)
+        if winning_candidate:
+            best_data = winning_candidate["data"]
+            best_attempt = best_data["best_attempt"]
+            best.update({
+                "text": best_attempt["text"],
+                "raw_text": best_attempt["raw_text"],
+                "confidence": best_attempt["confidence"],
+                "rank": winning_candidate["score"],
+                "engine": best_attempt["engine"],
+                "variant": best_attempt["variant"],
+                "box": best_attempt["box"],
+                "source": best_attempt["source"],
+                "plate_confidence": best_attempt["plate_confidence"],
+                "crop": best_attempt["crop"],
+                "enhanced": best_attempt["enhanced"],
+            })
 
         if best["crop"] is None and candidates:
-            crop = self._crop_with_padding(vehicle_crop, candidates[0]["box"], candidates[0].get("padding", 0.06))
+            crop = self._crop_with_padding(vehicle_crop, candidates[0]["box"], candidates[0].get("padding", 0.15))
             best.update({
                 "box": candidates[0]["box"],
                 "source": candidates[0]["source"],
@@ -706,50 +790,132 @@ class OcrEngine:
             })
 
         best["attempts"] = sorted(
-            best["attempts"],
+            all_attempts,
             key=lambda item: self._candidate_rank(item.get("text", ""), item.get("confidence", 0.0)),
             reverse=True
         )[:40]
         return best
 
-    def _build_ocr_inputs(self, plate_crop):
-        corrected = self._upscale_if_needed(plate_crop)
-        gray = cv2.cvtColor(corrected, cv2.COLOR_BGR2GRAY) if len(corrected.shape) == 3 else corrected
-
-        gray = cv2.copyMakeBorder(gray, 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=255)
-        color_padded = cv2.copyMakeBorder(corrected, 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=(255, 255, 255))
-
-        clahe = cv2.createCLAHE(clipLimit=2.8, tileGridSize=(8, 8)).apply(gray)
-        denoised = cv2.fastNlMeansDenoising(clahe, h=10, templateWindowSize=7, searchWindowSize=21)
-        denoised = cv2.bilateralFilter(denoised, 7, 50, 50)
-
-        sharp_kernel = np.array([[0, -1, 0], [-1, 5.4, -1], [0, -1, 0]], dtype=np.float32)
-        sharpened = cv2.filter2D(denoised, -1, sharp_kernel)
-        contrast = cv2.convertScaleAbs(sharpened, alpha=1.22, beta=8)
-
-        block = max(21, (min(contrast.shape[:2]) // 6) * 2 + 1)
-        adaptive = cv2.adaptiveThreshold(
-            contrast,
-            255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            block,
-            9
-        )
-        _, otsu = cv2.threshold(contrast, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    def _get_ocr_v3_variants(self, crop):
+        # 1. Original (padded)
+        color_padded = cv2.copyMakeBorder(crop, 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=(255, 255, 255))
+        
+        # 7. Perspective Corrected (warped using 4-point transform)
+        perspective_corrected = self._perspective_correct(crop)
+        if perspective_corrected is None or perspective_corrected.size == 0:
+            perspective_corrected = crop.copy()
+            
+        # 8. Super Resolution (upscaling by 2x using Lanczos)
+        super_res = self._upscale_if_needed(perspective_corrected, min_width=240)
+        
+        # Converting to grayscale for standard thresholds
+        gray = cv2.cvtColor(super_res, cv2.COLOR_BGR2GRAY) if len(super_res.shape) == 3 else super_res
+        gray_padded = cv2.copyMakeBorder(gray, 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=255)
+        
+        # 2. CLAHE
+        clahe_obj = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        clahe = clahe_obj.apply(gray_padded)
+        
+        # 3. Bilateral Filter
+        bilateral = cv2.bilateralFilter(clahe, 9, 75, 75)
+        
+        # 6. Sharpened
+        sharp_kernel = np.array([[0, -1, 0], [-1, 5.0, -1], [0, -1, 0]], dtype=np.float32)
+        sharpened = cv2.filter2D(bilateral, -1, sharp_kernel)
+        
+        # 4. Adaptive Threshold
+        block = max(11, (min(sharpened.shape[:2]) // 6) * 2 + 1)
+        adaptive = cv2.adaptiveThreshold(sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, block, 9)
         adaptive = self._ensure_dark_text_on_light(adaptive)
+        
+        # 5. OTSU Threshold
+        _, otsu = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         otsu = self._ensure_dark_text_on_light(otsu)
-
+        
+        # Build variants (Phase 4 requirement)
         variants = [
-            {"name": "original_crop", "image": color_padded},
-            {"name": "upscaled_crop", "image": corrected},
-            {"name": "sharpened_crop", "image": sharpened},
-            {"name": "contrast_enhanced", "image": contrast},
-            {"name": "thresholded_crop", "image": otsu},
-            {"name": "adaptive_threshold", "image": adaptive},
+            {"name": "original", "image": color_padded},
+            {"name": "clahe", "image": cv2.cvtColor(clahe, cv2.COLOR_GRAY2BGR)},
+            {"name": "bilateral", "image": cv2.cvtColor(bilateral, cv2.COLOR_GRAY2BGR)},
+            {"name": "adaptive_threshold", "image": cv2.cvtColor(adaptive, cv2.COLOR_GRAY2BGR)},
+            {"name": "otsu_threshold", "image": cv2.cvtColor(otsu, cv2.COLOR_GRAY2BGR)},
+            {"name": "sharpened", "image": cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)},
+            {"name": "perspective_corrected", "image": perspective_corrected},
+            {"name": "super_resolution", "image": super_res}
         ]
+        return variants, adaptive
 
-        variants.extend(self._line_focus_inputs(corrected))
+    def _perform_voting_system(self, attempts):
+        """
+        Calculates the best string match from the multi-engine variants pool.
+        """
+        if not attempts:
+            return None
+            
+        votes = {}
+        for attempt in attempts:
+            text = attempt["text"]
+            if not text:
+                continue
+            if text not in votes:
+                votes[text] = {
+                    "text": text,
+                    "raw_text": attempt["raw_text"],
+                    "confidence_sum": 0.0,
+                    "max_confidence": 0.0,
+                    "engines": set(),
+                    "attempts_count": 0,
+                    "valid": attempt["valid"],
+                    "best_attempt": attempt
+                }
+            v = votes[text]
+            v["confidence_sum"] += attempt["confidence"]
+            v["max_confidence"] = max(v["max_confidence"], attempt["confidence"])
+            v["engines"].add(attempt["engine"])
+            v["attempts_count"] += 1
+            if attempt["confidence"] > v["best_attempt"]["confidence"]:
+                v["best_attempt"] = attempt
+
+        scored_candidates = []
+        for text, v in votes.items():
+            # Base score is the maximum confidence
+            score = v["max_confidence"]
+            
+            # Boost for Indian standard regex formats
+            if v["valid"]:
+                score += 5.0
+            else:
+                clean_len = len(self._clean_plate_text(text))
+                if 7 <= clean_len <= 11:
+                    score += 1.0
+                else:
+                    score -= 1.0
+            
+            # Boost for Multi-Engine Agreement
+            agreement_count = len(v["engines"])
+            if agreement_count >= 3:
+                score += 3.0
+            elif agreement_count == 2:
+                score += 1.5
+                
+            # Boost for attempt frequency
+            score += min(v["attempts_count"] * 0.1, 0.5)
+            
+            scored_candidates.append({
+                "text": text,
+                "score": score,
+                "data": v
+            })
+            
+        if not scored_candidates:
+            return None
+            
+        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+        return scored_candidates[0]
+
+    def _build_ocr_inputs(self, plate_crop):
+        # Deprecated: Kept for legacy signature protection, replaced by V3 variants generator.
+        variants, adaptive = self._get_ocr_v3_variants(plate_crop)
         return variants, adaptive
 
     def _line_focus_inputs(self, plate_crop):
@@ -863,15 +1029,53 @@ class OcrEngine:
             return 255 - image
         return image
 
-    def _run_ocr_attempts(self, variants):
+    def _run_ocr_attempts(self, variants, start_time_global, timeout=2.5):
         attempts = []
+        easyocr_calls = 0
         for variant in variants:
+            # Check elapsed time budget
+            elapsed = time.perf_counter() - start_time_global
+            if elapsed >= timeout:
+                logger.info(f"OCR variant budget exceeded ({elapsed:.2f}s). Exiting variants loop early.")
+                break
+
             image = variant["image"]
             variant_name = variant["name"]
-            if self.easy_loaded and self.easy_reader is not None:
-                attempts.extend(self._run_easyocr(image, variant_name))
+            tasks = []
+            
+            # Smart Engine selection:
+            # EasyOCR is slow on CPU and performs best on natural scene crops.
+            # Avoid running EasyOCR on binarized threshold variants (adaptive and OTSU)
+            is_binarized = variant_name in ["adaptive_threshold", "otsu_threshold"]
+            
+            if self.easy_loaded and self.easy_reader is not None and not is_binarized:
+                # Limit EasyOCR calls to max 4 to protect execution pipeline latency
+                if easyocr_calls < 4:
+                    tasks.append(("easyocr", self._run_easyocr))
+                    easyocr_calls += 1
             if self.paddle_loaded and self.paddle_reader is not None:
-                attempts.extend(self._run_paddleocr(image, variant_name))
+                tasks.append(("paddleocr", self._run_paddleocr))
+            if self.tesseract_loaded:
+                tasks.append(("tesseract", self._run_tesseract))
+
+            if self.parallel_ocr and len(tasks) > 1:
+                with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+                    futures = [
+                        executor.submit(fn, image, variant_name)
+                        for _, fn in tasks
+                    ]
+                    for future in as_completed(futures):
+                        try:
+                            attempts.extend(future.result())
+                        except Exception as e:
+                            logger.error(f"Parallel OCR task failed for {variant_name}: {e}")
+            else:
+                for _, fn in tasks:
+                    attempts.extend(fn(image, variant_name))
+
+            # Early Exit inside variants loop
+            if any(self._is_valid_plate(a.get("text", "")) and a.get("confidence", 0.0) >= self.high_confidence_cutoff for a in attempts):
+                return attempts
         return attempts
 
     def _run_easyocr(self, image, variant_name):
@@ -893,6 +1097,24 @@ class OcrEngine:
             return self._attempts_from_easy_results(normalized, "paddleocr", variant_name)
         except Exception as e:
             logger.error(f"PaddleOCR failed for {variant_name}: {e}")
+            return []
+
+    def _run_tesseract(self, image, variant_name):
+        try:
+            import pytesseract
+            custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+            raw_text = pytesseract.image_to_string(image, config=custom_config).strip()
+            
+            data = pytesseract.image_to_data(image, config=custom_config, output_type=pytesseract.Output.DICT)
+            confidences = [float(c) for c in data['conf'] if c != -1 and c != '-1']
+            confidence = sum(confidences) / (100.0 * len(confidences)) if confidences else 0.50
+            
+            text = self._normalize_plate_candidate(raw_text)
+            if text:
+                return [self._attempt("tesseract", variant_name, raw_text, text, confidence)]
+            return []
+        except Exception as e:
+            logger.error(f"Tesseract failed for {variant_name}: {e}")
             return []
 
     def _parse_paddle_results(self, results):
@@ -983,7 +1205,8 @@ class OcrEngine:
     def _summarize_engine_attempts(self, attempts):
         summary = {
             "easyocr": {"available": self.easy_loaded, "best_text": "", "confidence": 0.0, "variant": ""},
-            "paddleocr": {"available": self.paddle_loaded, "best_text": "", "confidence": 0.0, "variant": "", "error": self.paddle_error}
+            "paddleocr": {"available": self.paddle_loaded, "best_text": "", "confidence": 0.0, "variant": "", "error": self.paddle_error},
+            "tesseract": {"available": self.tesseract_loaded, "best_text": "", "confidence": 0.0, "variant": "", "error": self.tesseract_error}
         }
         for attempt in attempts:
             engine = attempt.get("engine")

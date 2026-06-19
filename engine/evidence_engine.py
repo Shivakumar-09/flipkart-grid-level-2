@@ -7,7 +7,8 @@ import numpy as np
 from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from database.postgres import SessionLocal, Vehicle, Violation, Challan, OCRResult, RepeatOffender
+from sqlalchemy import func
+from database.postgres import SessionLocal, Vehicle, Violation, Challan, OCRResult, RepeatOffender, EvidencePackage
 
 logger = logging.getLogger("EvidenceEngine")
 
@@ -42,11 +43,37 @@ class EvidenceEngine:
     def _generate_challan_id(self, session, offset=0):
         """
         Generates sequential Challan IDs like CHN-2026-00001
+        Uses database sequence to ensure uniqueness
         """
-        count = session.query(Violation).count()
         year = datetime.now().year
-        challan_seq = count + 1 + offset
-        return f"CHN-{year}-{challan_seq:05d}"
+        
+        # Get the highest existing challan sequence
+        max_existing = session.query(func.max(Challan.challan_id)).scalar()
+        
+        if max_existing:
+            try:
+                # Extract sequence number from existing ID
+                seq_str = max_existing.split('-')[-1]
+                challan_seq = int(seq_str) + 1 + offset
+            except:
+                challan_seq = 1 + offset
+        else:
+            challan_seq = 1 + offset
+        
+        # Ensure uniqueness by checking if ID exists
+        max_attempts = 10
+        attempts = 0
+        while attempts < max_attempts:
+            candidate_id = f"CHN-{year}-{challan_seq:05d}"
+            existing = session.query(Challan).filter_by(challan_id=candidate_id).first()
+            if not existing:
+                return candidate_id
+            challan_seq += 1
+            attempts += 1
+        
+        # Fallback: use UUID-based suffix
+        import uuid
+        return f"CHN-{year}-{str(uuid.uuid4())[:8].upper()}"
 
     def _get_fine_amount(self, violation_type):
         """
@@ -58,7 +85,9 @@ class EvidenceEngine:
             "OVERLOADING": 2000,
             "SEATBELT_VIOLATION": 1000,
             "WRONG_SIDE_DRIVING": 5000,
-            "ILLEGAL_PARKING": 1000
+            "ILLEGAL_PARKING": 1000,
+            "RED_LIGHT_VIOLATION": 10000,
+            "STOP_LINE_VIOLATION": 1000
         }
         return fines.get(violation_type, 1000)
 
@@ -82,6 +111,14 @@ class EvidenceEngine:
         session = SessionLocal()
         try:
             for idx, v in enumerate(process_result.get("violations", [])):
+                if v.get("type") == "REVIEW_REQUIRED":
+                    logger.info(
+                        "Skipping challan for review-only item: %s (%s)",
+                        v.get("subtype", "unknown"),
+                        v.get("details", ""),
+                    )
+                    continue
+
                 violation_id = str(uuid.uuid4())
                 challan_id = self._generate_challan_id(session, offset=idx)
                 timestamp_dt = datetime.now()
@@ -110,6 +147,15 @@ class EvidenceEngine:
                     cv2.imwrite(os.path.join(package_dir, "annotated.jpg"), anno_crop)
                 else:
                     cv2.imwrite(os.path.join(package_dir, "annotated.jpg"), annotated_image)
+                    
+                if v["type"] == "SEATBELT_VIOLATION":
+                    if anno_crop.size > 0:
+                        cv2.imwrite(os.path.join(package_dir, "seatbelt_evidence.jpg"), anno_crop)
+                    else:
+                        cv2.imwrite(os.path.join(package_dir, "seatbelt_evidence.jpg"), annotated_image)
+
+                if v["type"] == "STOP_LINE_VIOLATION":
+                    cv2.imwrite(os.path.join(package_dir, "stopline_evidence.jpg"), annotated_image)
                     
                 # Save full original and annotated images for side-by-side display (Step 7)
                 cv2.imwrite(os.path.join(package_dir, "original_full.jpg"), original_image)
@@ -150,11 +196,21 @@ class EvidenceEngine:
                     package_dir,
                     "ocr_result.jpg"
                 )
+                copied_vehicle_crop = self._copy_relative_artifact(
+                    ocr_debug_paths.get("vehicle_crop"),
+                    package_dir,
+                    "vehicle_crop.jpg"
+                )
+                if not copied_vehicle_crop:
+                    src_orig = os.path.join(package_dir, "original.jpg")
+                    if os.path.exists(src_orig):
+                        shutil.copyfile(src_orig, os.path.join(package_dir, "vehicle_crop.jpg"))
+                        copied_vehicle_crop = True
                 
                 if not copied_plate:
                     v_h = y2 - y1
                     v_w = x2 - x1
-                    plate_crop = orig_crop[int(v_h * 0.5):int(v_h * 0.95), int(v_w * 0.15):int(v_w * 0.85)] if orig_crop.size > 0 else None
+                    plate_crop = orig_crop[int(v_h * 0.35):int(v_h * 0.90), int(v_w * 0.15):int(v_w * 0.85)] if orig_crop.size > 0 else None
                     if plate_crop is not None and plate_crop.size > 0:
                         cv2.imwrite(os.path.join(package_dir, "plate_crop.jpg"), plate_crop)
                     else:
@@ -231,6 +287,39 @@ class EvidenceEngine:
                     ocr_result_path=challan_json["ocr_result_path"]
                 )
                 session.add(ocr_res_obj)
+                
+                evidence_obj = EvidencePackage(
+                    evidence_id=str(uuid.uuid4()),
+                    violation_id=violation_id,
+                    image_paths=json.dumps({
+                        "plate_crop": challan_json["plate_crop_path"],
+                        "enhanced_plate": challan_json["enhanced_plate_path"],
+                        "ocr_result": challan_json["ocr_result_path"],
+                        "original_full": challan_json["original_full_path"],
+                        "annotated_full": challan_json["annotated_full_path"],
+                        "vehicle_crop": os.path.join("outputs", "evidence", violation_id, "vehicle_crop.jpg").replace("\\", "/") if copied_vehicle_crop else "",
+                        "seatbelt_evidence": os.path.join("outputs", "evidence", violation_id, "seatbelt_evidence.jpg").replace("\\", "/") if v["type"] == "SEATBELT_VIOLATION" else "",
+                        "stopline_evidence": os.path.join("outputs", "evidence", violation_id, "stopline_evidence.jpg").replace("\\", "/") if v["type"] == "STOP_LINE_VIOLATION" else ""
+                    }),
+                    ocr_results=json.dumps({
+                        "plate_number": plate_num,
+                        "ocr_confidence": ocr_confidence,
+                        "ocr_engine": ocr_engine,
+                        "attempts": [
+                            {
+                                "engine": a.get("engine"),
+                                "variant": a.get("variant"),
+                                "raw_text": a.get("raw_text"),
+                                "text": a.get("text"),
+                                "confidence": float(a.get("confidence") or 0.0),
+                                "valid": bool(a.get("valid") or False)
+                            }
+                            for a in v.get("ocr_attempts", [])
+                        ]
+                    }),
+                    generated_timestamp=timestamp_dt
+                )
+                session.add(evidence_obj)
                 
                 violations_recorded.append(challan_json)
                 logger.info(f"Generated Auto-Challan {challan_id} (Fine: {fine_amount}) for {plate_num}")

@@ -1,6 +1,7 @@
 import cv2
 import logging
 import numpy as np
+from utils.runtime import get_yolo_model
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -11,11 +12,12 @@ class VehicleDetector:
         self.model_path = model_path
         self.model = None
         self.is_loaded = False
+        self.device = "cpu"
         try:
-            from ultralytics import YOLO
-            self.model = YOLO(model_path)
+            self.model, self.device, load_ms, from_cache = get_yolo_model(model_path)
             self.is_loaded = True
-            logger.info(f"YOLOv8 Model loaded successfully from {model_path}.")
+            source = "cache" if from_cache else f"{load_ms:.1f}ms"
+            logger.info(f"YOLOv8 Model ready from {model_path} on {self.device} ({source}).")
         except Exception as e:
             logger.warning(f"Could not load YOLOv8 model: {e}. Running in simulation/fallback mode.")
 
@@ -32,7 +34,7 @@ class VehicleDetector:
 
         if self.is_loaded and self.model is not None:
             try:
-                results = self.model(image, verbose=False)
+                results = self.model(image, verbose=False, device=self.device)
                 for box in results[0].boxes:
                     cls_id = int(box.cls[0].item())
                     label = self.model.names[cls_id]

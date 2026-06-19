@@ -1,7 +1,9 @@
 import os
 import json
 import logging
-from datetime import datetime, timedelta, time
+import time
+from datetime import datetime, timedelta, time as time_type
+from functools import wraps
 from sqlalchemy import func, Date
 from database.postgres import (
     SessionLocal, Vehicle, Violation, Challan, OCRResult,
@@ -9,6 +11,31 @@ from database.postgres import (
 )
 
 logger = logging.getLogger("AnalyticsEngine")
+
+# Simple caching decorator for analytics methods
+def analytics_cache(timeout=30):
+    """Cache decorator for analytics methods"""
+    def decorator(f):
+        cache_store = {}
+        cache_timestamps = {}
+        
+        @wraps(f)
+        def decorated_function(self, *args, **kwargs):
+            cache_key = f"{f.__name__}"
+            now = time.time()
+            
+            # Check if cache exists and is still valid
+            if cache_key in cache_store and cache_key in cache_timestamps:
+                if now - cache_timestamps[cache_key] < timeout:
+                    return cache_store[cache_key]
+            
+            # Cache miss - execute function
+            result = f(self, *args, **kwargs)
+            cache_store[cache_key] = result
+            cache_timestamps[cache_key] = now
+            return result
+        return decorated_function
+    return decorator
 
 class AnalyticsEngine:
     def __init__(self, db_path="database/trafficflow.db"):
@@ -22,6 +49,7 @@ class AnalyticsEngine:
         except Exception as e:
             logger.error(f"Failed to load camera_locations.json in AnalyticsEngine: {e}")
 
+    @analytics_cache(timeout=20)
     def get_summary_metrics(self):
         """
         Aggregate overview metrics: total violations today, most congested area,
@@ -30,8 +58,8 @@ class AnalyticsEngine:
         session = SessionLocal()
         try:
             # 1. Total Violations Today
-            today_start = datetime.combine(datetime.now().date(), time.min)
-            today_end = datetime.combine(datetime.now().date(), time.max)
+            today_start = datetime.combine(datetime.now().date(), time_type.min)
+            today_end = datetime.combine(datetime.now().date(), time_type.max)
             violations_today = session.query(Violation).filter(
                 Violation.timestamp >= today_start,
                 Violation.timestamp <= today_end
@@ -91,6 +119,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=30)
     def get_violation_breakdown(self):
         """
         Get count of violations grouped by type.
@@ -103,7 +132,9 @@ class AnalyticsEngine:
                 "TRIPLE_RIDING": 0,
                 "WRONG_SIDE_DRIVING": 0,
                 "ILLEGAL_PARKING": 0,
-                "SEATBELT_VIOLATION": 0
+                "SEATBELT_VIOLATION": 0,
+                "RED_LIGHT_VIOLATION": 0,
+                "STOP_LINE_VIOLATION": 0
             }
             for vtype, count in v_types:
                 breakdown[vtype] = count
@@ -114,6 +145,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=30)
     def get_repeat_offenders(self):
         """
         Identify vehicles with multiple violations.
@@ -132,6 +164,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=45)
     def get_violation_hotspots(self):
         """
         Aggregate hotspots (locations with calculated hotspot scores and rank).
@@ -152,7 +185,7 @@ class AnalyticsEngine:
             rep_counts = session.query(
                 Violation.camera_id,
                 func.count(func.distinct(Vehicle.plate_number))
-            ).join(Vehicle).filter(Vehicle.plate_number.in_(subq)).group_by(Violation.camera_id).all()
+            ).join(Vehicle).filter(Vehicle.plate_number.in_(session.query(subq.c.plate_number))).group_by(Violation.camera_id).all()
             repeat_offenders_counts = {camera_id: count for camera_id, count in rep_counts}
             
             hotspots = []
@@ -202,6 +235,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=30)
     def get_peak_hours(self):
         """
         Calculate hourly violation counts for 0-23 hours.
@@ -239,6 +273,7 @@ class AnalyticsEngine:
             })
         return wards
 
+    @analytics_cache(timeout=60)
     def get_daily_trends(self):
         """
         Returns daily trends for the last 7 days.
@@ -300,6 +335,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=60)
     def get_weekend_vs_weekday_trends(self):
         """
         Aggregates violations/density into weekday vs weekend count.
@@ -318,6 +354,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=60)
     def get_monthly_trends(self):
         """
         Returns monthly aggregate violation counts for the current year.
@@ -347,6 +384,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=45)
     def get_top_congested_areas(self):
         """
         Aggregate top congested areas from analytics logs.
@@ -409,6 +447,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=30)
     def get_live_alerts(self):
         """
         Retrieves the 10 most recent police patrol alerts.
@@ -429,6 +468,7 @@ class AnalyticsEngine:
         finally:
             session.close()
 
+    @analytics_cache(timeout=20)
     def get_sms_logs(self):
         """
         Retrieves the 10 most recent SMS notifications.
