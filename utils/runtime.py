@@ -1,9 +1,19 @@
 import logging
 import os
+import tempfile
 import threading
 import time
 
 logger = logging.getLogger("TrafficFlowRuntime")
+
+YOLO_CONFIG_DIR = os.environ.setdefault(
+    "YOLO_CONFIG_DIR",
+    os.path.join(tempfile.gettempdir(), "Ultralytics")
+)
+try:
+    os.makedirs(YOLO_CONFIG_DIR, exist_ok=True)
+except OSError as exc:
+    logger.warning(f"Could not create YOLO_CONFIG_DIR at {YOLO_CONFIG_DIR}: {exc}")
 
 _YOLO_CACHE = {}
 _YOLO_LOCK = threading.Lock()

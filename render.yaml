@@ -23,6 +23,8 @@ services:
         value: "+919876543210"
       - key: TRAFFICFLOW_MAX_INFERENCE_WIDTH
         value: "640"
+      - key: YOLO_CONFIG_DIR
+        value: "/tmp/Ultralytics"
       - key: FLASK_ENV
         value: "production"
       # Set these in the Render Dashboard → Environment:

@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Working directory ────────────────────────────────────────
 WORKDIR /app
 
+# Keep Ultralytics from trying to write under /root/.config on Render.
+ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
+
 # ── Python dependencies ──────────────────────────────────────
 COPY requirements.txt .
 RUN pip install --upgrade pip --no-cache-dir \
@@ -34,7 +37,8 @@ COPY . .
 RUN python download_models.py
 
 # ── Ensure runtime output directories exist ──────────────────
-RUN mkdir -p outputs/uploads outputs/debug/helmet challans ocr_debug
+RUN mkdir -p outputs/uploads outputs/debug/helmet challans ocr_debug "$YOLO_CONFIG_DIR" \
+ && chmod -R 777 "$YOLO_CONFIG_DIR"
 
 # ── Expose port ──────────────────────────────────────────────
 EXPOSE 10000
