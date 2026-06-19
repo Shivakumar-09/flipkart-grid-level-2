@@ -1020,6 +1020,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Refresh logs and charts
             initDashboardData();
+
+            // Automatically switch to Enforcement Log tab to see the record
+            setTimeout(() => {
+                const navViolations = document.getElementById("nav-violations");
+                if (navViolations) {
+                    navViolations.click();
+                    showToast("Inference completed! View new record in Enforcement Log.", "success");
+                }
+            }, 1000);
         } catch (err) {
             btnProcess.textContent = "Execute Inference Pipeline";
             btnProcess.disabled = false;
