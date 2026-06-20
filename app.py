@@ -1542,7 +1542,8 @@ def update_challan_plate(challan_id):
 def reset_dispatch():
     session = SessionLocal()
     try:
-        session.query(PatrolDispatch).delete()\n        session.query(PoliceAlert).delete()\n
+        session.query(PatrolDispatch).delete()
+        session.query(PoliceAlert).delete()
         session.commit()
         # Also clear cache to reflect changes immediately
         for k in list(_cache_store.keys()):
