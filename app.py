@@ -761,7 +761,7 @@ def upload_frame():
             }
 
             # Clear image buffers from memory
-                        if 'first_frame' in locals():
+            if 'first_frame' in locals():
                 del first_frame
             if 'mock_process_result' in locals():
                 del mock_process_result
