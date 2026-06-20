@@ -1537,6 +1537,24 @@ def update_challan_plate(challan_id):
 
 
 # API: Dispatch Patrol Unit (simulates dispatch alerts and Twilio notifications)
+
+@app.route('/api/reset_dispatch', methods=['GET', 'POST'])
+def reset_dispatch():
+    session = SessionLocal()
+    try:
+        session.query(PatrolDispatch).delete()
+        session.commit()
+        # Also clear cache to reflect changes immediately
+        for k in list(_api_cache_store.keys()):
+            if 'recommendations' in k or 'deployed_patrols' in k:
+                del _api_cache_store[k]
+        return jsonify({"status": "success", "message": "All dispatch records cleared."})
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
 @app.route('/api/dispatch', methods=['POST'])
 def dispatch_patrol():
     try:
