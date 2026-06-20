@@ -443,7 +443,15 @@ class ViolationEngine:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
         # Check Seatbelt Non-Compliance (Phase 3 & 4)
-        vehicles = [d for d in detections if d['label'] in ['car', 'truck', 'bus']]
+        vehicles = []
+        for d in detections:
+            if d['label'] in ['car', 'truck', 'bus']:
+                vw = d['box'][2] - d['box'][0]
+                vh = d['box'][3] - d['box'][1]
+                # Filter out small or background vehicles where seatbelts are invisible
+                if vw > 150 and vh > 100:
+                    vehicles.append(d)
+        
         for veh in vehicles:
             veh_box = veh['box']
             veh_label = veh['label']

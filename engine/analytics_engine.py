@@ -280,29 +280,29 @@ class AnalyticsEngine:
         """
         session = SessionLocal()
         try:
+            today = datetime.now()
+            # Initialize the last 7 days with 0 counts
+            last_7_days = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
+            daily_counts = {day: 0 for day in last_7_days}
+
+            # Query the database for those days
             rows = session.query(
                 func.to_char(Violation.timestamp, 'YYYY-MM-DD').label('dt'),
                 func.count(Violation.id)
-            ).group_by(func.to_char(Violation.timestamp, 'YYYY-MM-DD')).order_by(func.to_char(Violation.timestamp, 'YYYY-MM-DD').desc()).limit(7).all()
+            ).filter(
+                func.to_char(Violation.timestamp, 'YYYY-MM-DD').in_(last_7_days)
+            ).group_by(func.to_char(Violation.timestamp, 'YYYY-MM-DD')).all()
             
-            rows = list(reversed(rows))
+            for r in rows:
+                if r[0] in daily_counts:
+                    daily_counts[r[0]] = r[1]
             
-            if not rows:
-                # Fallback mock trend
-                today = datetime.now()
-                labels = [(today - timedelta(days=i)).strftime("%b %d") for i in range(6, -1, -1)]
-                counts = [42, 51, 48, 59, 61, 58, 64]
-                return {"labels": labels, "counts": counts}
-                
             labels = []
             counts = []
-            for r in rows:
-                try:
-                    dt_obj = datetime.strptime(r[0], "%Y-%m-%d")
-                    labels.append(dt_obj.strftime("%b %d"))
-                except Exception:
-                    labels.append(r[0])
-                counts.append(r[1])
+            for day in last_7_days:
+                dt_obj = datetime.strptime(day, "%Y-%m-%d")
+                labels.append(dt_obj.strftime("%b %d"))
+                counts.append(daily_counts[day])
                 
             return {
                 "labels": labels,

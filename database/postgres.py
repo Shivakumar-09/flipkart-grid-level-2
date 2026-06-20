@@ -18,9 +18,6 @@ load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 # Database configuration URL
 DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL and ("localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL):
-    logger.warning("DATABASE_URL contains localhost or 127.0.0.1. Fallback to local PostgreSQL is disabled.")
-    DATABASE_URL = None
 
 if not DATABASE_URL:
     logger.warning("DATABASE_URL environment variable is not set. Database integration is disabled.")

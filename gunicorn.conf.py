@@ -10,4 +10,4 @@ timeout = 120
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"
-preload_app = False  # App is loaded dynamically, but wait, preloading is NOT recommended here because models load lazily on first inference request.
+preload_app = False

@@ -305,6 +305,7 @@ class EvidenceEngine:
                         "plate_number": plate_num,
                         "ocr_confidence": ocr_confidence,
                         "ocr_engine": ocr_engine,
+                        "helmet_debug": v.get("helmet_debug"),
                         "attempts": [
                             {
                                 "engine": a.get("engine"),

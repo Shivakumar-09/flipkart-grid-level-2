@@ -19,30 +19,67 @@ _cache_warming_lock = threading.Lock()
 
 def make_json_safe(obj):
     import numpy as np
+    import dataclasses
     from datetime import datetime
 
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
+    try:
+        if obj is None:
+            return None
 
-    if isinstance(obj, np.integer):
-        return int(obj)
+        # Check standard types
+        if isinstance(obj, (int, float, str, bool)):
+            return obj
 
-    if isinstance(obj, np.floating):
-        return float(obj)
+        if isinstance(obj, np.ndarray):
+            return make_json_safe(obj.tolist())
 
-    if isinstance(obj, np.bool_):
-        return bool(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
 
-    if isinstance(obj, datetime):
-        return obj.isoformat()
+        if isinstance(obj, np.floating):
+            return float(obj)
 
-    if isinstance(obj, dict):
-        return {k: make_json_safe(v) for k,v in obj.items()}
+        if isinstance(obj, np.bool_):
+            return bool(obj)
 
-    if isinstance(obj, (list, tuple)):
-        return [make_json_safe(x) for x in obj]
+        if isinstance(obj, datetime):
+            return obj.isoformat()
 
-    return obj
+        if dataclasses.is_dataclass(obj):
+            return make_json_safe(dataclasses.asdict(obj))
+
+        if isinstance(obj, dict):
+            new_dict = {}
+            for k, v in obj.items():
+                try:
+                    new_dict[k] = make_json_safe(v)
+                except Exception as ex:
+                    logger.error(f"JSON serialization failure at dict key '{k}': {ex}")
+                    raise ex
+            return new_dict
+
+        if isinstance(obj, (list, tuple, set)):
+            return [make_json_safe(x) for x in obj]
+
+        # If it has __dict__, try serializing it (avoid SQLAlchemy model loops)
+        if hasattr(obj, '__dict__'):
+            if '_sa_instance_state' in obj.__dict__:
+                from sqlalchemy import inspect
+                try:
+                    state = inspect(obj)
+                    return {attr.key: make_json_safe(attr.value) for attr in state.attrs if not attr.metadata}
+                except Exception:
+                    return {k: make_json_safe(v) for k, v in obj.__dict__.items() if not k.startswith('_') and not isinstance(v, (list, dict))}
+            else:
+                return {k: make_json_safe(v) for k, v in obj.__dict__.items()}
+
+        return str(obj)
+    except Exception as e:
+        logger.error(f"Failed to serialize object of type {type(obj)}: {e}")
+        return str(obj)
+
+_processing_times = []
+_processing_times_lock = threading.Lock()
 from flask import Flask, request, jsonify, render_template, send_from_directory, Response, has_request_context
 from flask_compress import Compress
 from sqlalchemy import func
@@ -131,32 +168,50 @@ app = Flask(
 # Enable Gzip compression for faster responses
 Compress(app)
 
+@app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({
+        "status": "ok"
+    })
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("TrafficFlowApp")
 
-# Import system engines
-# (Delay engine import or wrap to handle potential runtime load anomalies cleanly)
-try:
-    from engine.violation_engine import ViolationEngine
-    from engine.evidence_engine import EvidenceEngine
-    from engine.analytics_engine import AnalyticsEngine
 
-    violation_engine = ViolationEngine()
-    evidence_engine = EvidenceEngine(
-        db_path=os.path.join(DATABASE_DIR, "trafficflow.db"),
-        output_dir=OUTPUTS_DIR
-    )
-    analytics_engine = AnalyticsEngine(
-        db_path=os.path.join(DATABASE_DIR, "trafficflow.db")
-    )
-    logger.info("Engines integrated successfully.")
-except Exception as e:
-    logger.critical(f"Engine initialization failed: {e}")
-    # Fallback placeholders if imports fail on fresh environment check
-    violation_engine = None
-    evidence_engine = None
-    analytics_engine = None
+# Lazy load engines
+class LazyEngineProxy:
+    def __init__(self, engine_name):
+        self.engine_name = engine_name
+        self._instance = None
+    
+    def _get_instance(self):
+        if self._instance is None:
+            if self.engine_name == 'violation':
+                from engine.violation_engine import ViolationEngine
+                self._instance = ViolationEngine()
+            elif self.engine_name == 'evidence':
+                from engine.evidence_engine import EvidenceEngine
+                self._instance = EvidenceEngine(
+                    db_path=os.path.join(DATABASE_DIR, "trafficflow.db"),
+                    output_dir=OUTPUTS_DIR
+                )
+            elif self.engine_name == 'analytics':
+                from engine.analytics_engine import AnalyticsEngine
+                self._instance = AnalyticsEngine(
+                    db_path=os.path.join(DATABASE_DIR, "trafficflow.db")
+                )
+        return self._instance
+
+    def __getattr__(self, name):
+        return getattr(self._get_instance(), name)
+
+violation_engine = LazyEngineProxy('violation')
+evidence_engine = LazyEngineProxy('evidence')
+analytics_engine = LazyEngineProxy('analytics')
+
 
 def resolve_customer_contact(plate_number):
     plate_key = (plate_number or "UNKNOWN").strip().upper()
@@ -277,14 +332,7 @@ def serve_challans(filename):
 def index():
     return render_template('index.html')
 
-# Platform health checks should not trigger database, OCR, or YOLO work.
-@app.route('/health', methods=['GET'])
-@app.route('/api/health', methods=['GET'])
-def health():
-    return jsonify({
-        "status": "healthy",
-        "service": "TrafficFlow"
-    })
+
 
 # API: Summary Metrics
 @app.route('/api/metrics', methods=['GET'])
@@ -537,6 +585,15 @@ def get_logs():
                     "vehicle_crop": vehicle_crop_path
                 }
             }
+            
+            if evidence_package and evidence_package.ocr_results:
+                try:
+                    ocr_res_json = json.loads(evidence_package.ocr_results)
+                    if "helmet_debug" in ocr_res_json:
+                        d["helmet_debug"] = ocr_res_json["helmet_debug"]
+                except Exception:
+                    pass
+            
             logs.append(d)
         return jsonify(logs)
     except Exception as e:
@@ -704,12 +761,18 @@ def upload_frame():
             }
 
             # Clear image buffers from memory
-            if 'first_frame' in locals():
+                        if 'first_frame' in locals():
                 del first_frame
             if 'mock_process_result' in locals():
                 del mock_process_result
             import gc
             gc.collect()
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except:
+                pass
 
             for k,v in response_data.items():
                 print(f"{k}: {type(v)}")
@@ -1518,6 +1581,10 @@ def dispatch_patrol():
         sms_msg = f"🚨 BTP DISPATCH: Patrol unit deployed to {location} node for urgent action: {action}."
         noti = send_sms("PATROL_DISPATCH", "+919900000000", sms_msg)
         
+        # Clear API caches so dashboard updates instantly
+        _cache_store.clear()
+        _cache_timestamps.clear()
+
         return jsonify({
             "status": "success",
             "alert_id": dispatch_id,
@@ -1774,6 +1841,6 @@ start_cache_warming_thread(app)
 
 if __name__ == '__main__':
     # Local development server
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 5000))
     debug_mode = not _is_production
     app.run(host='0.0.0.0', port=port, debug=debug_mode, use_reloader=False)

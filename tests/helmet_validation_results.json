@@ -1,0 +1,121 @@
+{
+  "thresholds": {
+    "helmet_missing_threshold": 0.8
+  },
+  "results": [
+    {
+      "case": "full_face_dark_visor_helmet",
+      "fixture": "C:\\hackathon\\flipkart\\TrafficFlow\\tests\\fixtures\\helmet\\full_face_dark_visor_helmet.jpg",
+      "legacy_has_helmet": false,
+      "legacy_bare_head_ratio": 1.0,
+      "decision": "HELMET_OK",
+      "helmet_detected": true,
+      "helmet_confidence": 0.97,
+      "helmet_missing_confidence": 0.03,
+      "violation_trigger_reason": null,
+      "head_bbox": [
+        220,
+        80,
+        420,
+        148
+      ],
+      "helmet_bbox": [
+        220,
+        80,
+        420,
+        151
+      ],
+      "metrics": {
+        "helmet_shell_ratio": 1.0,
+        "skin_ratio": 0.0,
+        "bare_hair_ratio": 0.0,
+        "hair_visibility": 0.0,
+        "bare_head_ratio": 0.0,
+        "dark_coverage_ratio": 1.0,
+        "head_coverage_ratio": 1.0,
+        "valid_points": 0,
+        "source": "fallback_top_20pct",
+        "face_visible": false,
+        "ears_visible": false
+      },
+      "debug_panel": "C:\\hackathon\\flipkart\\TrafficFlow\\outputs\\debug\\helmet\\helmet_debug_rider_0.jpg",
+      "passed": true
+    },
+    {
+      "case": "white_helmet_rider",
+      "fixture": "C:\\hackathon\\flipkart\\TrafficFlow\\tests\\fixtures\\helmet\\white_helmet_rider.jpg",
+      "legacy_has_helmet": true,
+      "legacy_bare_head_ratio": 0.5067,
+      "decision": "HELMET_OK",
+      "helmet_detected": true,
+      "helmet_confidence": 0.8467,
+      "helmet_missing_confidence": 0.1533,
+      "violation_trigger_reason": null,
+      "head_bbox": [
+        225,
+        85,
+        415,
+        151
+      ],
+      "helmet_bbox": [
+        225,
+        85,
+        415,
+        154
+      ],
+      "metrics": {
+        "helmet_shell_ratio": 1.0,
+        "skin_ratio": 0.0,
+        "bare_hair_ratio": 0.0,
+        "hair_visibility": 0.0,
+        "bare_head_ratio": 0.0,
+        "dark_coverage_ratio": 0.5066985645933014,
+        "head_coverage_ratio": 1.0,
+        "valid_points": 0,
+        "source": "fallback_top_20pct",
+        "face_visible": false,
+        "ears_visible": false
+      },
+      "debug_panel": "C:\\hackathon\\flipkart\\TrafficFlow\\outputs\\debug\\helmet\\helmet_debug_rider_1.jpg",
+      "passed": true
+    },
+    {
+      "case": "bare_head_rider",
+      "fixture": "C:\\hackathon\\flipkart\\TrafficFlow\\tests\\fixtures\\helmet\\bare_head_rider.jpg",
+      "legacy_has_helmet": false,
+      "legacy_bare_head_ratio": 0.9753,
+      "decision": "HELMET_VIOLATION",
+      "helmet_detected": false,
+      "helmet_confidence": 0.15,
+      "helmet_missing_confidence": 0.85,
+      "violation_trigger_reason": "Insufficient head coverage",
+      "head_bbox": [
+        230,
+        90,
+        410,
+        156
+      ],
+      "helmet_bbox": [
+        230,
+        90,
+        410,
+        159
+      ],
+      "metrics": {
+        "helmet_shell_ratio": 0.6207912457912458,
+        "skin_ratio": 0.3792087542087542,
+        "bare_hair_ratio": 0.0,
+        "hair_visibility": 0.0,
+        "bare_head_ratio": 0.3792087542087542,
+        "dark_coverage_ratio": 0.5961279461279462,
+        "head_coverage_ratio": 1.0,
+        "valid_points": 0,
+        "source": "fallback_top_20pct",
+        "face_visible": false,
+        "ears_visible": false
+      },
+      "debug_panel": "C:\\hackathon\\flipkart\\TrafficFlow\\outputs\\debug\\helmet\\helmet_debug_rider_2.jpg",
+      "passed": true
+    }
+  ]
+}

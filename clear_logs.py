@@ -2,7 +2,8 @@ import os
 import logging
 from database.postgres import (
     SessionLocal, Violation, Challan, OCRResult,
-    RepeatOffender, PoliceAlert, PatrolDispatch, Payment, SMSLog, Analytics
+    RepeatOffender, PoliceAlert, PatrolDispatch, Payment, SMSLog, Analytics,
+    EvidencePackage, Vehicle, SafetyVideoView, CameraNode
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -35,8 +36,14 @@ def clear_logs():
         logger.info("Deleting OCRResult records...")
         session.query(OCRResult).delete()
         
+        logger.info("Deleting EvidencePackage records...")
+        session.query(EvidencePackage).delete()
+        
         logger.info("Deleting Violation records...")
         session.query(Violation).delete()
+
+        logger.info("Deleting Vehicle records...")
+        session.query(Vehicle).delete()
         
         logger.info("Deleting RepeatOffender records...")
         session.query(RepeatOffender).delete()
@@ -52,6 +59,12 @@ def clear_logs():
         
         logger.info("Deleting Analytics records...")
         session.query(Analytics).delete()
+        
+        logger.info("Deleting SafetyVideoView records...")
+        session.query(SafetyVideoView).delete()
+
+        logger.info("Deleting CameraNode records...")
+        session.query(CameraNode).delete()
         
         session.commit()
         logger.info("PostgreSQL enforcement logs cleared successfully.")

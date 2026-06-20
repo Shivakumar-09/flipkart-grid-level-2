@@ -35,7 +35,7 @@ class HelmetDetector:
 
     def _extract_head_region(self, rider_crop, person_box):
         head_local = None
-        keypoint_debug = {"valid_points": 0, "source": "fallback_top_20pct"}
+        keypoint_debug = {"valid_points": 0, "source": "fallback_top_20pct", "face_visible": False, "ears_visible": False}
 
         if self.is_loaded and self.model is not None:
             try:
@@ -46,6 +46,19 @@ class HelmetDetector:
                         head_pts = keypoints[0:5]
                         valid_head_pts = head_pts[(head_pts[:, 0] > 0) & (head_pts[:, 1] > 0)]
                         keypoint_debug["valid_points"] = int(len(valid_head_pts))
+                        
+                        if len(head_pts) == 5:
+                            nose = head_pts[0]
+                            l_eye = head_pts[1]
+                            r_eye = head_pts[2]
+                            l_ear = head_pts[3]
+                            r_ear = head_pts[4]
+                            
+                            keypoint_debug["face_visible"] = bool((nose[0] > 0 and nose[1] > 0) or 
+                                                                 (l_eye[0] > 0 and l_eye[1] > 0) or 
+                                                                 (r_eye[0] > 0 and r_eye[1] > 0))
+                            keypoint_debug["ears_visible"] = bool((l_ear[0] > 0 and l_ear[1] > 0) or 
+                                                                 (r_ear[0] > 0 and r_ear[1] > 0))
 
                         if len(valid_head_pts) > 0:
                             min_hx = np.min(valid_head_pts[:, 0])
@@ -121,12 +134,16 @@ class HelmetDetector:
         dark_coverage_ratio = float(np.sum(dark_mask)) / total_pixels
         bare_head_ratio = skin_ratio + bare_hair_ratio
 
+        head_coverage_ratio = min(1.0, helmet_shell_ratio + dark_coverage_ratio)
+
         return {
             "helmet_shell_ratio": helmet_shell_ratio,
             "skin_ratio": skin_ratio,
             "bare_hair_ratio": bare_hair_ratio,
+            "hair_visibility": bare_hair_ratio,
             "bare_head_ratio": bare_head_ratio,
             "dark_coverage_ratio": dark_coverage_ratio,
+            "head_coverage_ratio": head_coverage_ratio,
         }
 
     def _classify(self, metrics):
@@ -134,15 +151,36 @@ class HelmetDetector:
         skin_ratio = metrics["skin_ratio"]
         bare_head_ratio = metrics["bare_head_ratio"]
         dark_coverage_ratio = metrics["dark_coverage_ratio"]
+        hair_visibility = metrics.get("hair_visibility", 0.0)
+        head_coverage_ratio = metrics.get("head_coverage_ratio", 0.0)
+        face_visible = metrics.get("face_visible", False)
+        ears_visible = metrics.get("ears_visible", False)
 
+        # PHASE 2: Rule-Based Sanity Checks
+        # Force HELMET_VIOLATION if head/face/hair clearly visible, unless strong helmet detected
+        strong_helmet_detected = (helmet_shell_ratio >= 0.28 or (dark_coverage_ratio >= 0.40 and skin_ratio <= 0.25))
+
+        if (hair_visibility > 0.20 or bare_head_ratio > 0.50 or skin_ratio > 0.60 or face_visible or ears_visible) and not strong_helmet_detected:
+            reason = "Hair and forehead visible" if (hair_visibility > 0.20 or face_visible) else "Bare head detected"
+            missing_confidence = min(0.99, max(0.85, 0.60 + bare_head_ratio * 0.40))
+            return False, missing_confidence, 1.0 - missing_confidence, reason
+
+        # PHASE 3: Helmet Validation
         # Full-face helmet with dark visor: large dark coverage, minimal exposed skin.
         if dark_coverage_ratio >= 0.40 and skin_ratio <= 0.25:
             helmet_confidence = min(0.99, 0.72 + dark_coverage_ratio * 0.25)
-            return True, 1.0 - helmet_confidence, helmet_confidence, "dark_full_face_helmet"
+            # Validation check
+            if helmet_confidence > 0.70 and head_coverage_ratio > 0.70 and bare_head_ratio < 0.30 and skin_ratio < 0.50:
+                return True, 1.0 - helmet_confidence, helmet_confidence, "dark_full_face_helmet"
+            else:
+                return False, 0.85, 1.0 - 0.85, "Insufficient head coverage"
 
         if helmet_shell_ratio >= 0.28:
             helmet_confidence = min(0.99, 0.70 + helmet_shell_ratio * 0.29)
-            return True, 1.0 - helmet_confidence, helmet_confidence, "helmet_shell_detected"
+            if helmet_confidence > 0.70 and head_coverage_ratio > 0.70 and bare_head_ratio < 0.30 and skin_ratio < 0.50:
+                return True, 1.0 - helmet_confidence, helmet_confidence, "Helmet shell covers head"
+            else:
+                return False, 0.85, 1.0 - 0.85, "Insufficient head coverage"
 
         if bare_head_ratio > 0.60 and helmet_shell_ratio < 0.15:
             missing_confidence = min(0.99, 0.70 + bare_head_ratio * 0.29)
@@ -152,7 +190,7 @@ class HelmetDetector:
             missing_confidence = min(0.85, 0.55 + bare_head_ratio * 0.30)
             return False, missing_confidence, 1.0 - missing_confidence, "probable_bare_head"
 
-        return None, 0.50, 0.50, "insufficient_evidence"
+        return False, 0.80, 0.20, "No helmet shell detected"
 
     def _estimate_helmet_bbox(self, head_local, metrics, rider_crop_shape):
         hx1, hy1, hx2, hy2 = head_local
@@ -270,6 +308,7 @@ class HelmetDetector:
             return empty_result
 
         metrics = self._analyze_head_crop(head_crop)
+        metrics.update(keypoint_debug)
         helmet_detected, missing_conf, helmet_conf, reason = self._classify(metrics)
 
         helmet_local = self._estimate_helmet_bbox(head_local, metrics, rider_crop.shape)

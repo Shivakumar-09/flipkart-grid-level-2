@@ -857,7 +857,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <td><span class="badge ${typeClass}">${log.violation_type}</span></td>
                         <td><strong style="font-family: monospace; letter-spacing: 0.5px;">${log.plate_number || 'UNKNOWN'}</strong></td>
                         <td style="color: var(--accent-red); font-weight: 600;">₹${log.amount}</td>
-                        <td title="OCR confidence">${(Number(log.ocr_confidence || 0) * 100).toFixed(0)}%</td>
+                        <td title="Detection confidence">${(Number(log.confidence || 0) * 100).toFixed(0)}%</td>
                         <td><span class="status-badge">${log.status}</span></td>
                     `;
                     tableBody.appendChild(row);
@@ -964,6 +964,40 @@ document.addEventListener("DOMContentLoaded", () => {
         setText("ocr-confidence", `${(ocrConfidence * 100).toFixed(0)}%`);
         setText("ocr-engine", resData.ocr_engine || "none");
 
+        // Update Helmet Diagnostics
+        const helmetConfEl = document.getElementById("helmet-confidence");
+        const helmetReasonEl = document.getElementById("helmet-reason");
+        const helmetStatusEl = document.getElementById("helmet-status");
+
+        if (helmetConfEl && helmetReasonEl && helmetStatusEl) {
+            if (resData.helmet_debug && resData.helmet_debug.length > 0) {
+                let worstH = resData.helmet_debug.find(h => h.decision === "HELMET_VIOLATION") || resData.helmet_debug[0];
+                let hConf = Number(worstH.helmet_confidence) || 0;
+                helmetConfEl.textContent = `${(hConf * 100).toFixed(0)}%`;
+                
+                let reasonText = worstH.violation_trigger_reason || "None";
+                // Shorten some reasons for UI
+                if (reasonText.length > 25) {
+                    reasonText = reasonText.substring(0, 22) + "...";
+                }
+                helmetReasonEl.textContent = reasonText;
+                helmetStatusEl.textContent = worstH.decision;
+                
+                if (worstH.decision === "HELMET_VIOLATION") {
+                    helmetStatusEl.style.color = "var(--accent-red, #ff4d6d)";
+                } else if (worstH.decision === "REVIEW_REQUIRED") {
+                    helmetStatusEl.style.color = "var(--accent-amber, #ffb800)";
+                } else {
+                    helmetStatusEl.style.color = "var(--accent-emerald, #10b981)";
+                }
+            } else {
+                helmetConfEl.textContent = "--";
+                helmetReasonEl.textContent = "--";
+                helmetStatusEl.textContent = "--";
+                helmetStatusEl.style.color = "var(--accent-emerald, #10b981)";
+            }
+        }
+
         const violationsList = document.getElementById("res-violations-list");
         if (!violationsList) return;
 
@@ -1035,6 +1069,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     showToast("Inference completed! View new record in Enforcement Log.", "success");
                 }
             }, 1000);
+
+            // Auto-refresh the page after one minute to clear pipeline and refresh dashboard
+            setTimeout(() => {
+                window.location.reload();
+            }, 60000);
         } catch (err) {
             btnProcess.textContent = "Execute Inference Pipeline";
             btnProcess.disabled = false;
@@ -1376,6 +1415,31 @@ document.addEventListener("DOMContentLoaded", () => {
         setText("modal-confidence", `${(Number(log.ocr_confidence || 0) * 100).toFixed(0)}%`);
         setText("modal-ocr-engine", log.ocr_engine || "none");
         setText("modal-fine-amount", `₹${log.amount}`);
+
+        // Populate Helmet Diagnostics
+        const helmetConfEl = document.getElementById("modal-helmet-confidence");
+        const helmetReasonEl = document.getElementById("modal-helmet-reason");
+        const helmetStatusEl = document.getElementById("modal-helmet-status");
+
+        if (helmetConfEl && helmetReasonEl && helmetStatusEl) {
+            if (log.helmet_debug && log.helmet_debug.length > 0) {
+                let worstH = log.helmet_debug[0];
+                let hConf = Number(worstH.helmet_confidence) || 0;
+                helmetConfEl.textContent = `${(hConf * 100).toFixed(0)}%`;
+                
+                let reasonText = worstH.violation_trigger_reason || "None";
+                if (reasonText.length > 25) reasonText = reasonText.substring(0, 22) + "...";
+                helmetReasonEl.textContent = reasonText;
+                
+                helmetStatusEl.textContent = worstH.decision;
+                helmetStatusEl.style.color = "var(--accent-red, #ff4d6d)";
+            } else {
+                helmetConfEl.textContent = "--";
+                helmetReasonEl.textContent = "--";
+                helmetStatusEl.textContent = "--";
+                helmetStatusEl.style.color = "var(--accent-emerald, #10b981)";
+            }
+        }
 
         // Populate OCR Debugger crops
         const debugPaths = log.ocr_debug_paths || {};
@@ -2624,6 +2688,39 @@ document.addEventListener("DOMContentLoaded", () => {
                                         btn.className = "rec-dispatch-btn dispatched";
                                         btn.disabled = true;
                                         showToast(`Patrol dispatched to ${rec.location}!`, "success");
+                                        
+                                        // Optimistic UI update for Active Officer Deployments
+                                        const deployedContainer = document.getElementById("deployed-officers-container");
+                                        if (deployedContainer) {
+                                            // Remove the "no patrols" placeholder if it exists
+                                            const firstChild = deployedContainer.firstElementChild;
+                                            if (firstChild && firstChild.innerText && firstChild.innerText.includes("No patrols dispatched yet")) {
+                                                deployedContainer.innerHTML = "";
+                                            }
+
+                                            const now = new Date();
+                                            const timeString = now.toLocaleTimeString('en-GB', { hour12: false });
+
+                                            const card = document.createElement("div");
+                                            card.className = "rec-cc-card";
+                                            card.style.cssText = "background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px;";
+                                            card.innerHTML = `
+                                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                    <strong style="color: #fff; font-size: 0.88rem;">${rec.location}</strong>
+                                                    <span class="hotspot-score-badge score-high" style="font-size: 0.65rem; padding: 2px 6px; min-width: auto; height: auto; line-height: 1.2; background: rgba(0, 240, 255, 0.15); border: 1px solid rgba(0, 240, 255, 0.4); color: #00f0ff;">ACTIVE</span>
+                                                </div>
+                                                <div style="font-size: 0.82rem; color: var(--text-secondary);">Patrol unit dispatched to ${rec.location}: ${rec.suggested_action}</div>
+                                                <div style="font-size: 0.72rem; color: var(--text-muted); text-align: right; margin-top: 4px;">Time: ${timeString}</div>
+                                            `;
+                                            deployedContainer.prepend(card);
+                                            
+                                            const badge = document.getElementById("deployed-count-badge");
+                                            if (badge) {
+                                                const currentCount = parseInt(badge.textContent) || 0;
+                                                badge.textContent = `${currentCount + 1} Deployed`;
+                                            }
+                                        }
+
                                         // Trigger full data pull to update logs, notification tables, and charts!
                                         initDashboardData();
                                     } else {
