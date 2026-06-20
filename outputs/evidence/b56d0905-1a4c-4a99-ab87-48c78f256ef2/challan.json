@@ -1,0 +1,15 @@
+{
+    "violation_id": "b56d0905-1a4c-4a99-ab87-48c78f256ef2",
+    "challan_id": "CHN-2026-00709",
+    "plate_number": "KA98WP6194",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-06",
+    "time": "17:21:12",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.96,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

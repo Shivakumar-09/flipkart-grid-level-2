@@ -1,0 +1,15 @@
+{
+    "violation_id": "ec79d14f-0725-4044-978e-b24989151adf",
+    "challan_id": "CHN-2026-00483",
+    "plate_number": "KA18EX1502",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-17",
+    "time": "18:59:02",
+    "location": "Hebbal",
+    "camera_id": "CAM_BLR_005",
+    "confidence_score": 0.93,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

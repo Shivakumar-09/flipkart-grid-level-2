@@ -1,0 +1,22 @@
+{
+    "violation_id": "0db1e4d7-630d-4960-9462-444b0fc1f18f",
+    "challan_id": "CHN-2026-00016",
+    "plate_number": "UNKNOWN",
+    "violation_type": "OVERLOADING",
+    "type": "OVERLOADING",
+    "details": "Overloading two-wheeler with 6 passengers",
+    "date": "2026-06-20",
+    "time": "20:35:39",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.95,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 2000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/0db1e4d7-630d-4960-9462-444b0fc1f18f/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/0db1e4d7-630d-4960-9462-444b0fc1f18f/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/0db1e4d7-630d-4960-9462-444b0fc1f18f/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/0db1e4d7-630d-4960-9462-444b0fc1f18f/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/0db1e4d7-630d-4960-9462-444b0fc1f18f/annotated_full.jpg"
+}

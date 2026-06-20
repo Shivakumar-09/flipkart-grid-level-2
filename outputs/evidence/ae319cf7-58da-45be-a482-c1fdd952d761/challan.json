@@ -1,0 +1,22 @@
+{
+    "violation_id": "ae319cf7-58da-45be-a482-c1fdd952d761",
+    "challan_id": "CHN-2026-00724",
+    "plate_number": "TS07OV8550",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple riding detected (Rider count: 6)",
+    "date": "2026-06-19",
+    "time": "17:09:02",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.92,
+    "ocr_confidence": 0.8888009600607123,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/ae319cf7-58da-45be-a482-c1fdd952d761/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/ae319cf7-58da-45be-a482-c1fdd952d761/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/ae319cf7-58da-45be-a482-c1fdd952d761/annotated_full.jpg"
+}

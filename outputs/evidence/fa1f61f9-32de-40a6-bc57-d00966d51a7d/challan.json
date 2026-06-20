@@ -1,0 +1,15 @@
+{
+    "violation_id": "fa1f61f9-32de-40a6-bc57-d00966d51a7d",
+    "challan_id": "CHN-2026-00003",
+    "plate_number": "KA03MM8812",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-14",
+    "time": "12:31:01",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.97,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

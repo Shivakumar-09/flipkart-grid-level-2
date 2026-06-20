@@ -1,0 +1,22 @@
+{
+    "violation_id": "084f1a89-2649-477e-ad4e-3773d4d7542a",
+    "challan_id": "CHN-2026-00723",
+    "plate_number": "UNKNOWN",
+    "violation_type": "STOP_LINE_VIOLATION",
+    "type": "STOP_LINE_VIOLATION",
+    "details": "Car front bumper crossed configured stop line by 258px",
+    "date": "2026-06-19",
+    "time": "16:27:10",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.72,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/084f1a89-2649-477e-ad4e-3773d4d7542a/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/084f1a89-2649-477e-ad4e-3773d4d7542a/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/084f1a89-2649-477e-ad4e-3773d4d7542a/annotated_full.jpg"
+}

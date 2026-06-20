@@ -1,0 +1,15 @@
+{
+    "violation_id": "f811c0d2-2363-4f94-8a23-524921c2804e",
+    "challan_id": "CHN-2026-00621",
+    "plate_number": "KA13XF9176",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-13",
+    "time": "18:40:29",
+    "location": "Koramangala",
+    "camera_id": "CAM_BLR_007",
+    "confidence_score": 0.96,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

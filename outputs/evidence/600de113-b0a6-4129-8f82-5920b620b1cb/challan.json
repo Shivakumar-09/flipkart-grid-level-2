@@ -1,0 +1,22 @@
+{
+    "violation_id": "600de113-b0a6-4129-8f82-5920b620b1cb",
+    "challan_id": "CHN-2026-00005",
+    "plate_number": "UNKNOWN",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Rider #1 without helmet (missing_conf=0.85, reason=Insufficient head coverage)",
+    "date": "2026-06-20",
+    "time": "15:02:21",
+    "location": "Electronic City",
+    "camera_id": "CAM_BLR_003",
+    "confidence_score": 0.85,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/600de113-b0a6-4129-8f82-5920b620b1cb/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/600de113-b0a6-4129-8f82-5920b620b1cb/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/600de113-b0a6-4129-8f82-5920b620b1cb/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/600de113-b0a6-4129-8f82-5920b620b1cb/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/600de113-b0a6-4129-8f82-5920b620b1cb/annotated_full.jpg"
+}

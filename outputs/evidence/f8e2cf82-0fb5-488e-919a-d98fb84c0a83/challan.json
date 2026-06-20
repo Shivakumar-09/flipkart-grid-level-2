@@ -1,0 +1,15 @@
+{
+    "violation_id": "f8e2cf82-0fb5-488e-919a-d98fb84c0a83",
+    "challan_id": "CHN-2026-00347",
+    "plate_number": "KA75AV9889",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-12",
+    "time": "14:46:12",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.86,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

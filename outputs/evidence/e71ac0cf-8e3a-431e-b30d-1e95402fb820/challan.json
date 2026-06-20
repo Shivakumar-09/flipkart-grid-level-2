@@ -1,0 +1,15 @@
+{
+    "violation_id": "e71ac0cf-8e3a-431e-b30d-1e95402fb820",
+    "challan_id": "CHN-2026-00546",
+    "plate_number": "KA49FG6598",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-17",
+    "time": "00:18:59",
+    "location": "KR Puram",
+    "camera_id": "CAM_BLR_006",
+    "confidence_score": 0.86,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

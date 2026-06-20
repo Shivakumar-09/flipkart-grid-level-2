@@ -1,0 +1,15 @@
+{
+    "violation_id": "c99b8ad7-7450-4813-b67d-31c0975c1342",
+    "challan_id": "CHN-2026-00200",
+    "plate_number": "KA35OL6000",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-08",
+    "time": "18:50:51",
+    "location": "Whitefield",
+    "camera_id": "CAM_BLR_002",
+    "confidence_score": 0.85,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

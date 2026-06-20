@@ -1,0 +1,22 @@
+{
+    "violation_id": "74022ea6-f5e6-4176-8894-a33676414a7e",
+    "challan_id": "CHN-2026-00728",
+    "plate_number": "TS8P2760",
+    "violation_type": "STOP_LINE_VIOLATION",
+    "type": "STOP_LINE_VIOLATION",
+    "details": "Motorcycle front bumper crossed configured stop line by 677px",
+    "date": "2026-06-19",
+    "time": "17:23:25",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.72,
+    "ocr_confidence": 0.9047298636558562,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/74022ea6-f5e6-4176-8894-a33676414a7e/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/74022ea6-f5e6-4176-8894-a33676414a7e/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/74022ea6-f5e6-4176-8894-a33676414a7e/annotated_full.jpg"
+}

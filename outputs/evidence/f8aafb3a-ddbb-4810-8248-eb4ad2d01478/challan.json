@@ -1,0 +1,15 @@
+{
+    "violation_id": "f8aafb3a-ddbb-4810-8248-eb4ad2d01478",
+    "challan_id": "CHN-2026-00610",
+    "plate_number": "KA88NI1939",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-06",
+    "time": "17:54:14",
+    "location": "Koramangala",
+    "camera_id": "CAM_BLR_007",
+    "confidence_score": 0.92,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

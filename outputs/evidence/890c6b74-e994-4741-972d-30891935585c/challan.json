@@ -1,0 +1,22 @@
+{
+    "violation_id": "890c6b74-e994-4741-972d-30891935585c",
+    "challan_id": "CHN-2026-00721",
+    "plate_number": "UNKNOWN",
+    "violation_type": "OVERLOADING",
+    "type": "OVERLOADING",
+    "details": "Overloading two-wheeler with 4 passengers",
+    "date": "2026-06-19",
+    "time": "17:04:09",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.95,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 2000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/890c6b74-e994-4741-972d-30891935585c/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/890c6b74-e994-4741-972d-30891935585c/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/890c6b74-e994-4741-972d-30891935585c/annotated_full.jpg"
+}

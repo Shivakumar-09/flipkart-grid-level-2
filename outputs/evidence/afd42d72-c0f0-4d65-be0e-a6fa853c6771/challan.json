@@ -1,0 +1,15 @@
+{
+    "violation_id": "afd42d72-c0f0-4d65-be0e-a6fa853c6771",
+    "challan_id": "CHN-2026-00622",
+    "plate_number": "KA76MR2929",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-01",
+    "time": "02:24:57",
+    "location": "Koramangala",
+    "camera_id": "CAM_BLR_007",
+    "confidence_score": 0.93,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

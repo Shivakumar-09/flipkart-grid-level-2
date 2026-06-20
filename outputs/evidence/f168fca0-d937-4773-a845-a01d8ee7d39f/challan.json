@@ -1,0 +1,22 @@
+{
+    "violation_id": "f168fca0-d937-4773-a845-a01d8ee7d39f",
+    "challan_id": "CHN-2026-00720",
+    "plate_number": "UNKNOWN",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple riding detected (Rider count: 4)",
+    "date": "2026-06-19",
+    "time": "17:04:07",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.92,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/f168fca0-d937-4773-a845-a01d8ee7d39f/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/f168fca0-d937-4773-a845-a01d8ee7d39f/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/f168fca0-d937-4773-a845-a01d8ee7d39f/annotated_full.jpg"
+}

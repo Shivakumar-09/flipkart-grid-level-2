@@ -1,0 +1,15 @@
+{
+    "violation_id": "93717f77-b844-4754-b701-0bc78f0e655a",
+    "challan_id": "CHN-2026-00518",
+    "plate_number": "KA69YS8354",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-12",
+    "time": "04:18:55",
+    "location": "KR Puram",
+    "camera_id": "CAM_BLR_006",
+    "confidence_score": 0.91,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

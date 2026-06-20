@@ -1,0 +1,15 @@
+{
+    "violation_id": "73af6683-29f7-4dc9-b817-7cd8358ae2fb",
+    "challan_id": "CHN-2026-00569",
+    "plate_number": "KA13KD6493",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-16",
+    "time": "19:59:22",
+    "location": "KR Puram",
+    "camera_id": "CAM_BLR_006",
+    "confidence_score": 0.95,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

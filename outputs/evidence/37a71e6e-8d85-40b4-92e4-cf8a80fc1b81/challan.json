@@ -1,0 +1,22 @@
+{
+    "violation_id": "37a71e6e-8d85-40b4-92e4-cf8a80fc1b81",
+    "challan_id": "CHN-2026-00734",
+    "plate_number": "TS07HY9768",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Rider #1 without helmet (missing_conf=0.95, reason=mocked_violation_for_testing)",
+    "date": "2026-06-20",
+    "time": "14:10:56",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.95,
+    "ocr_confidence": 0.9222252625916497,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/37a71e6e-8d85-40b4-92e4-cf8a80fc1b81/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/37a71e6e-8d85-40b4-92e4-cf8a80fc1b81/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/37a71e6e-8d85-40b4-92e4-cf8a80fc1b81/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/37a71e6e-8d85-40b4-92e4-cf8a80fc1b81/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/37a71e6e-8d85-40b4-92e4-cf8a80fc1b81/annotated_full.jpg"
+}

@@ -1,0 +1,22 @@
+{
+    "violation_id": "603e1e1a-c310-480c-a8f5-9f8dc9cdd6a5",
+    "challan_id": "CHN-2026-00011",
+    "plate_number": "UNKNOWN",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong side driving detected (vehicles must keep left)",
+    "date": "2026-06-20",
+    "time": "15:06:14",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.42857558727264405,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 5000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/603e1e1a-c310-480c-a8f5-9f8dc9cdd6a5/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/603e1e1a-c310-480c-a8f5-9f8dc9cdd6a5/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/603e1e1a-c310-480c-a8f5-9f8dc9cdd6a5/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/603e1e1a-c310-480c-a8f5-9f8dc9cdd6a5/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/603e1e1a-c310-480c-a8f5-9f8dc9cdd6a5/annotated_full.jpg"
+}

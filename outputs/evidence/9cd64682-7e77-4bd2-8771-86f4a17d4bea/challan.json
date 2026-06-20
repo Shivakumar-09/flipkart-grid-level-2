@@ -1,0 +1,22 @@
+{
+    "violation_id": "9cd64682-7e77-4bd2-8771-86f4a17d4bea",
+    "challan_id": "CHN-2026-00007",
+    "plate_number": "UNKNOWN",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Driver in car non-compliant with seatbelt safety regulations",
+    "date": "2026-06-20",
+    "time": "15:05:45",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.78,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/9cd64682-7e77-4bd2-8771-86f4a17d4bea/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/9cd64682-7e77-4bd2-8771-86f4a17d4bea/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/9cd64682-7e77-4bd2-8771-86f4a17d4bea/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/9cd64682-7e77-4bd2-8771-86f4a17d4bea/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/9cd64682-7e77-4bd2-8771-86f4a17d4bea/annotated_full.jpg"
+}

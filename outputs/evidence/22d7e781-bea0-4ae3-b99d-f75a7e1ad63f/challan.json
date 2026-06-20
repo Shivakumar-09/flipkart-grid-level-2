@@ -1,0 +1,15 @@
+{
+    "violation_id": "22d7e781-bea0-4ae3-b99d-f75a7e1ad63f",
+    "challan_id": "CHN-2026-00693",
+    "plate_number": "KA43UZ4728",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-04",
+    "time": "19:13:37",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.93,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

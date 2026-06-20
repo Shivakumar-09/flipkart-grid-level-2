@@ -1,0 +1,15 @@
+{
+    "violation_id": "8c0b7a3d-1f30-43d0-a1c9-2c90f8093785",
+    "challan_id": "CHN-2026-00664",
+    "plate_number": "KA67HE2586",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-13",
+    "time": "18:40:58",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.97,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "f2a8d3f4-ec76-4039-834a-ff8c93ce7830",
+    "challan_id": "CHN-2026-00636",
+    "plate_number": "KA60WX8842",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-14",
+    "time": "17:59:08",
+    "location": "HSR Layout",
+    "camera_id": "CAM_BLR_008",
+    "confidence_score": 0.82,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

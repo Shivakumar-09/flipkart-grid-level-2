@@ -1,0 +1,15 @@
+{
+    "violation_id": "23adcd33-a03f-49f7-b1c0-00c8742b0cb0",
+    "challan_id": "CHN-2026-00705",
+    "plate_number": "KA55VY5331",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-14",
+    "time": "17:57:53",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.89,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

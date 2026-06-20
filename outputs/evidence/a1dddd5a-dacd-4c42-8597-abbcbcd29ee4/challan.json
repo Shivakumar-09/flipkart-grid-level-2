@@ -1,0 +1,15 @@
+{
+    "violation_id": "a1dddd5a-dacd-4c42-8597-abbcbcd29ee4",
+    "challan_id": "CHN-2026-00351",
+    "plate_number": "KA36IR3146",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-06",
+    "time": "17:28:18",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.86,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

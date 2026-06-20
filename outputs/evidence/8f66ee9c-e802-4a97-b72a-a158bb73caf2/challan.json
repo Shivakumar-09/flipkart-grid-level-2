@@ -1,0 +1,15 @@
+{
+    "violation_id": "8f66ee9c-e802-4a97-b72a-a158bb73caf2",
+    "challan_id": "CHN-2026-00012",
+    "plate_number": "KA03MM8812",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-17",
+    "time": "19:14:10",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.98,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

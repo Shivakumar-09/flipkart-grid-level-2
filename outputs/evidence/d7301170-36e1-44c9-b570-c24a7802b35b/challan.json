@@ -1,0 +1,22 @@
+{
+    "violation_id": "d7301170-36e1-44c9-b570-c24a7802b35b",
+    "challan_id": "CHN-2026-00732",
+    "plate_number": "UNKNOWN",
+    "violation_type": "STOP_LINE_VIOLATION",
+    "type": "STOP_LINE_VIOLATION",
+    "details": "Motorcycle front bumper crossed configured stop line by 75px",
+    "date": "2026-06-19",
+    "time": "18:38:06",
+    "location": "HSR Layout",
+    "camera_id": "CAM_BLR_008",
+    "confidence_score": 0.72,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/d7301170-36e1-44c9-b570-c24a7802b35b/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/d7301170-36e1-44c9-b570-c24a7802b35b/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/d7301170-36e1-44c9-b570-c24a7802b35b/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/d7301170-36e1-44c9-b570-c24a7802b35b/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/d7301170-36e1-44c9-b570-c24a7802b35b/annotated_full.jpg"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "91ea8b3f-941f-4443-9e4f-7a3fae7d6dbc",
+    "challan_id": "CHN-2026-00316",
+    "plate_number": "KA87TZ4697",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-11",
+    "time": "14:55:34",
+    "location": "Electronic City",
+    "camera_id": "CAM_BLR_003",
+    "confidence_score": 0.93,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

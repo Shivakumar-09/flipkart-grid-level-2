@@ -1,0 +1,15 @@
+{
+    "violation_id": "6f5044ee-2016-47de-b10e-cee55e73c775",
+    "challan_id": "CHN-2026-00473",
+    "plate_number": "KA46TJ6761",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-12",
+    "time": "17:17:53",
+    "location": "Hebbal",
+    "camera_id": "CAM_BLR_005",
+    "confidence_score": 0.93,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

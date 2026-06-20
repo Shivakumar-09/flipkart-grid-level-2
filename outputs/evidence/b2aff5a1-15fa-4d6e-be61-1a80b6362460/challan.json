@@ -1,0 +1,15 @@
+{
+    "violation_id": "b2aff5a1-15fa-4d6e-be61-1a80b6362460",
+    "challan_id": "CHN-2026-00691",
+    "plate_number": "KA96DN6040",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-04",
+    "time": "19:32:37",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.83,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

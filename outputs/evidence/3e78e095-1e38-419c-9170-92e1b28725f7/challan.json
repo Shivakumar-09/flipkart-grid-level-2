@@ -1,0 +1,15 @@
+{
+    "violation_id": "3e78e095-1e38-419c-9170-92e1b28725f7",
+    "challan_id": "CHN-2026-00627",
+    "plate_number": "KA21ZV6236",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-03",
+    "time": "06:08:21",
+    "location": "HSR Layout",
+    "camera_id": "CAM_BLR_008",
+    "confidence_score": 0.88,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

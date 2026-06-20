@@ -1,0 +1,15 @@
+{
+    "violation_id": "db282c09-62fd-4287-b285-e6211bb9cf59",
+    "challan_id": "CHN-2026-00109",
+    "plate_number": "KA82WK4483",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-13",
+    "time": "17:46:08",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.85,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

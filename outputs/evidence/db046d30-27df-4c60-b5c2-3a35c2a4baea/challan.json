@@ -1,0 +1,22 @@
+{
+    "violation_id": "db046d30-27df-4c60-b5c2-3a35c2a4baea",
+    "challan_id": "CHN-2026-00725",
+    "plate_number": "TS07OV8550",
+    "violation_type": "OVERLOADING",
+    "type": "OVERLOADING",
+    "details": "Overloading two-wheeler with 6 passengers",
+    "date": "2026-06-19",
+    "time": "17:09:05",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.95,
+    "ocr_confidence": 0.8888009600607123,
+    "ocr_engine": "easyocr",
+    "fine_amount": 2000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/db046d30-27df-4c60-b5c2-3a35c2a4baea/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/db046d30-27df-4c60-b5c2-3a35c2a4baea/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/db046d30-27df-4c60-b5c2-3a35c2a4baea/annotated_full.jpg"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "5328a202-a12d-4dfc-aec2-f161356ca282",
+    "challan_id": "CHN-2026-00086",
+    "plate_number": "KA21GH9279",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-10",
+    "time": "19:48:15",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.93,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

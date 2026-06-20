@@ -1,0 +1,15 @@
+{
+    "violation_id": "76ef86fb-514f-4e09-bb67-bc7b51706a54",
+    "challan_id": "CHN-2026-00645",
+    "plate_number": "KA54QJ2292",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-06",
+    "time": "17:20:36",
+    "location": "HSR Layout",
+    "camera_id": "CAM_BLR_008",
+    "confidence_score": 0.95,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

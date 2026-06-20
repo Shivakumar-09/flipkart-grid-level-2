@@ -1,0 +1,15 @@
+{
+    "violation_id": "a56eb3c1-2a36-4fee-aa76-ec9dbc5567be",
+    "challan_id": "CHN-2026-00496",
+    "plate_number": "KA10GJ4460",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-15",
+    "time": "07:09:55",
+    "location": "Hebbal",
+    "camera_id": "CAM_BLR_005",
+    "confidence_score": 0.93,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

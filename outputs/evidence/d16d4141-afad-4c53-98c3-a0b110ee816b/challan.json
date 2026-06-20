@@ -1,0 +1,15 @@
+{
+    "violation_id": "d16d4141-afad-4c53-98c3-a0b110ee816b",
+    "challan_id": "CHN-2026-00608",
+    "plate_number": "KA31WO6759",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-02",
+    "time": "17:54:29",
+    "location": "Koramangala",
+    "camera_id": "CAM_BLR_007",
+    "confidence_score": 0.83,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

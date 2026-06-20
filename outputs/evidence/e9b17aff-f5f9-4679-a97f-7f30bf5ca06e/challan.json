@@ -1,0 +1,22 @@
+{
+    "violation_id": "e9b17aff-f5f9-4679-a97f-7f30bf5ca06e",
+    "challan_id": "CHN-2026-00718",
+    "plate_number": "TS07HY9768",
+    "violation_type": "STOP_LINE_VIOLATION",
+    "type": "STOP_LINE_VIOLATION",
+    "details": "Motorcycle front bumper crossed configured stop line by 589px",
+    "date": "2026-06-19",
+    "time": "16:25:05",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.72,
+    "ocr_confidence": 0.9233925208897159,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/e9b17aff-f5f9-4679-a97f-7f30bf5ca06e/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/e9b17aff-f5f9-4679-a97f-7f30bf5ca06e/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/e9b17aff-f5f9-4679-a97f-7f30bf5ca06e/annotated_full.jpg"
+}

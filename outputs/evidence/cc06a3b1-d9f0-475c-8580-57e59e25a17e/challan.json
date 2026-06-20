@@ -1,0 +1,22 @@
+{
+    "violation_id": "cc06a3b1-d9f0-475c-8580-57e59e25a17e",
+    "challan_id": "CHN-2026-00726",
+    "plate_number": "TS07OV8550",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Rider #1 without helmet (missing_conf=0.99, reason=bare_head_exceeds_threshold)",
+    "date": "2026-06-19",
+    "time": "17:09:08",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.9858,
+    "ocr_confidence": 0.8888009600607123,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/cc06a3b1-d9f0-475c-8580-57e59e25a17e/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/cc06a3b1-d9f0-475c-8580-57e59e25a17e/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/cc06a3b1-d9f0-475c-8580-57e59e25a17e/annotated_full.jpg"
+}

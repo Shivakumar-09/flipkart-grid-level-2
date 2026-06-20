@@ -1,0 +1,15 @@
+{
+    "violation_id": "549fae47-09e8-4573-a8b9-6b111782a8f7",
+    "challan_id": "CHN-2026-00489",
+    "plate_number": "KA96CI8259",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-05",
+    "time": "09:36:15",
+    "location": "Hebbal",
+    "camera_id": "CAM_BLR_005",
+    "confidence_score": 0.87,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

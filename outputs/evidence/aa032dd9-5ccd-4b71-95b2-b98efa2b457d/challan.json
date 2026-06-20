@@ -1,0 +1,15 @@
+{
+    "violation_id": "aa032dd9-5ccd-4b71-95b2-b98efa2b457d",
+    "challan_id": "CHN-2026-00659",
+    "plate_number": "KA69GK3353",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-10",
+    "time": "18:28:55",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.88,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

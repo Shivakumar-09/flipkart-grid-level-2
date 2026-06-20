@@ -1,0 +1,15 @@
+{
+    "violation_id": "a952c1f3-63de-4c62-b007-862e1bb8a5e9",
+    "challan_id": "CHN-2026-00263",
+    "plate_number": "KA16LH2124",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-02",
+    "time": "05:40:31",
+    "location": "Electronic City",
+    "camera_id": "CAM_BLR_003",
+    "confidence_score": 0.97,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

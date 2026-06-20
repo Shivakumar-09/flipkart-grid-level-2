@@ -1,0 +1,15 @@
+{
+    "violation_id": "de1a5301-950f-4dc8-a6bc-8baa2170f1f8",
+    "challan_id": "CHN-2026-00192",
+    "plate_number": "KA36VH2684",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-03",
+    "time": "04:01:29",
+    "location": "Whitefield",
+    "camera_id": "CAM_BLR_002",
+    "confidence_score": 0.94,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

@@ -1,0 +1,22 @@
+{
+    "violation_id": "1279d725-71b1-4493-a13e-0f0e0b52493e",
+    "challan_id": "CHN-2026-00723",
+    "plate_number": "UNKNOWN",
+    "violation_type": "STOP_LINE_VIOLATION",
+    "type": "STOP_LINE_VIOLATION",
+    "details": "Car front bumper crossed configured stop line by 189px",
+    "date": "2026-06-19",
+    "time": "17:04:14",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.72,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/1279d725-71b1-4493-a13e-0f0e0b52493e/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/1279d725-71b1-4493-a13e-0f0e0b52493e/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/1279d725-71b1-4493-a13e-0f0e0b52493e/annotated_full.jpg"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "aea59caf-500b-468b-910a-796b8030652e",
+    "challan_id": "CHN-2026-00342",
+    "plate_number": "KA95DF6403",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-11",
+    "time": "18:37:07",
+    "location": "Electronic City",
+    "camera_id": "CAM_BLR_003",
+    "confidence_score": 0.92,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

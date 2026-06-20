@@ -1,0 +1,15 @@
+{
+    "violation_id": "9defdf45-d475-470a-9a3e-60ddbb514601",
+    "challan_id": "CHN-2026-00238",
+    "plate_number": "KA64RO3607",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-01",
+    "time": "23:42:52",
+    "location": "Whitefield",
+    "camera_id": "CAM_BLR_002",
+    "confidence_score": 0.92,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

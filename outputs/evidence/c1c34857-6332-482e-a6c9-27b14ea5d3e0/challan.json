@@ -1,0 +1,15 @@
+{
+    "violation_id": "c1c34857-6332-482e-a6c9-27b14ea5d3e0",
+    "challan_id": "CHN-2026-00450",
+    "plate_number": "KA70OY6931",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-06",
+    "time": "19:22:02",
+    "location": "Hebbal",
+    "camera_id": "CAM_BLR_005",
+    "confidence_score": 0.85,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

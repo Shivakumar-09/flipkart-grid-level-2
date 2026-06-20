@@ -1,0 +1,22 @@
+{
+    "violation_id": "78f56046-cb8d-406f-adab-6ace6a727fc7",
+    "challan_id": "CHN-2026-00717",
+    "plate_number": "UNKNOWN",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Driver in car non-compliant with seatbelt safety regulations",
+    "date": "2026-06-19",
+    "time": "16:27:04",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.78,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/78f56046-cb8d-406f-adab-6ace6a727fc7/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/78f56046-cb8d-406f-adab-6ace6a727fc7/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/78f56046-cb8d-406f-adab-6ace6a727fc7/annotated_full.jpg"
+}

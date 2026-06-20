@@ -1,0 +1,15 @@
+{
+    "violation_id": "ddb2ab81-c550-456d-bc95-6e3082726dce",
+    "challan_id": "CHN-2026-00590",
+    "plate_number": "KA27BL9945",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-03",
+    "time": "18:56:18",
+    "location": "KR Puram",
+    "camera_id": "CAM_BLR_006",
+    "confidence_score": 0.85,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

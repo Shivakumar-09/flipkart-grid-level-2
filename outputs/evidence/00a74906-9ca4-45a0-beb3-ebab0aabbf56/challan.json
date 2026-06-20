@@ -1,0 +1,15 @@
+{
+    "violation_id": "00a74906-9ca4-45a0-beb3-ebab0aabbf56",
+    "challan_id": "CHN-2026-00708",
+    "plate_number": "KA48YJ4396",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-13",
+    "time": "03:47:59",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.84,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

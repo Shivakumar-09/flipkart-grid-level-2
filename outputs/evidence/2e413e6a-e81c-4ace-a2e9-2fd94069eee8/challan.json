@@ -1,0 +1,22 @@
+{
+    "violation_id": "2e413e6a-e81c-4ace-a2e9-2fd94069eee8",
+    "challan_id": "CHN-2026-00015",
+    "plate_number": "UNKNOWN",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple riding detected (Rider count: 6)",
+    "date": "2026-06-20",
+    "time": "20:35:37",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.92,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/2e413e6a-e81c-4ace-a2e9-2fd94069eee8/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/2e413e6a-e81c-4ace-a2e9-2fd94069eee8/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/2e413e6a-e81c-4ace-a2e9-2fd94069eee8/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/2e413e6a-e81c-4ace-a2e9-2fd94069eee8/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/2e413e6a-e81c-4ace-a2e9-2fd94069eee8/annotated_full.jpg"
+}

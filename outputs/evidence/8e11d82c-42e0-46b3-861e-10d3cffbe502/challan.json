@@ -1,0 +1,15 @@
+{
+    "violation_id": "8e11d82c-42e0-46b3-861e-10d3cffbe502",
+    "challan_id": "CHN-2026-00707",
+    "plate_number": "KA45RJ4684",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-15",
+    "time": "21:05:07",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.84,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

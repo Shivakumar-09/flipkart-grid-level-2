@@ -1,0 +1,15 @@
+{
+    "violation_id": "2729ae76-338f-4582-b7de-0ebf0a4d1d90",
+    "challan_id": "CHN-2026-00236",
+    "plate_number": "KA95QR6198",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-05",
+    "time": "01:57:36",
+    "location": "Whitefield",
+    "camera_id": "CAM_BLR_002",
+    "confidence_score": 0.91,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "957284ae-1973-4826-9d32-4e9680c72c16",
+    "challan_id": "CHN-2026-00159",
+    "plate_number": "KA29GJ4566",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-08",
+    "time": "18:18:28",
+    "location": "Whitefield",
+    "camera_id": "CAM_BLR_002",
+    "confidence_score": 0.93,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

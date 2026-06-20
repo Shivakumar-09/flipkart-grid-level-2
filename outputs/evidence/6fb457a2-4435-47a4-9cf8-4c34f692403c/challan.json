@@ -1,0 +1,15 @@
+{
+    "violation_id": "6fb457a2-4435-47a4-9cf8-4c34f692403c",
+    "challan_id": "CHN-2026-00665",
+    "plate_number": "KA16JM7850",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-06",
+    "time": "22:36:48",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.86,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

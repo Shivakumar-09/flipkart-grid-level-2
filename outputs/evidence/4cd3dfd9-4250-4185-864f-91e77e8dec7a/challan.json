@@ -1,0 +1,15 @@
+{
+    "violation_id": "4cd3dfd9-4250-4185-864f-91e77e8dec7a",
+    "challan_id": "CHN-2026-00628",
+    "plate_number": "KA95LW2063",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-04",
+    "time": "23:48:37",
+    "location": "HSR Layout",
+    "camera_id": "CAM_BLR_008",
+    "confidence_score": 0.86,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

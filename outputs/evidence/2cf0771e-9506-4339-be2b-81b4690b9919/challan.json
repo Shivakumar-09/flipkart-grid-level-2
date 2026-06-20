@@ -1,0 +1,15 @@
+{
+    "violation_id": "2cf0771e-9506-4339-be2b-81b4690b9919",
+    "challan_id": "CHN-2026-00304",
+    "plate_number": "KA47HL3939",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-15",
+    "time": "12:39:18",
+    "location": "Electronic City",
+    "camera_id": "CAM_BLR_003",
+    "confidence_score": 0.94,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "0a3d3323-0d47-4895-b222-42ef0cd32692",
+    "challan_id": "CHN-2026-00255",
+    "plate_number": "KA31OE9751",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-16",
+    "time": "19:35:30",
+    "location": "Electronic City",
+    "camera_id": "CAM_BLR_003",
+    "confidence_score": 0.85,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

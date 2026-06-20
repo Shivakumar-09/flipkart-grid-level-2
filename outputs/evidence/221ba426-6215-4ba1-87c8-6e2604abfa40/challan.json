@@ -1,0 +1,15 @@
+{
+    "violation_id": "221ba426-6215-4ba1-87c8-6e2604abfa40",
+    "challan_id": "CHN-2026-00380",
+    "plate_number": "KA79BT2121",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-11",
+    "time": "05:31:52",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.94,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

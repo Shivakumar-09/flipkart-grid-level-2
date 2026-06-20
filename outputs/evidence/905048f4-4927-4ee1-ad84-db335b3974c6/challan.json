@@ -1,0 +1,22 @@
+{
+    "violation_id": "905048f4-4927-4ee1-ad84-db335b3974c6",
+    "challan_id": "CHN-2026-00714",
+    "plate_number": "TS07HY9768",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Rider #2 without helmet",
+    "date": "2026-06-19",
+    "time": "16:25:00",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.9477779507941451,
+    "ocr_confidence": 0.9233925208897159,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/905048f4-4927-4ee1-ad84-db335b3974c6/plate_crop.jpg",
+    "enhanced_plate_path": "",
+    "ocr_result_path": "",
+    "original_full_path": "outputs/evidence/905048f4-4927-4ee1-ad84-db335b3974c6/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/905048f4-4927-4ee1-ad84-db335b3974c6/annotated_full.jpg"
+}

@@ -1,0 +1,22 @@
+{
+    "violation_id": "418d1d28-fd33-4d5a-bba6-9188a4939778",
+    "challan_id": "CHN-2026-00018",
+    "plate_number": "UNKNOWN",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Rider #2 without helmet (missing_conf=0.85, reason=Insufficient head coverage)",
+    "date": "2026-06-20",
+    "time": "20:35:42",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.85,
+    "ocr_confidence": 0.0,
+    "ocr_engine": "none",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/418d1d28-fd33-4d5a-bba6-9188a4939778/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/418d1d28-fd33-4d5a-bba6-9188a4939778/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/418d1d28-fd33-4d5a-bba6-9188a4939778/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/418d1d28-fd33-4d5a-bba6-9188a4939778/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/418d1d28-fd33-4d5a-bba6-9188a4939778/annotated_full.jpg"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "2e7192b6-bd86-456f-ba54-6411caf4edb2",
+    "challan_id": "CHN-2026-00020",
+    "plate_number": "KA51HA0492",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Helmet Violation recorded",
+    "date": "2026-06-07",
+    "time": "10:45:11",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.82,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

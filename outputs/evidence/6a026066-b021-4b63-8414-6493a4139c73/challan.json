@@ -1,0 +1,15 @@
+{
+    "violation_id": "6a026066-b021-4b63-8414-6493a4139c73",
+    "challan_id": "CHN-2026-00711",
+    "plate_number": "KA46DS9899",
+    "violation_type": "TRIPLE_RIDING",
+    "type": "TRIPLE_RIDING",
+    "details": "Triple Riding recorded",
+    "date": "2026-06-09",
+    "time": "20:25:22",
+    "location": "Yelahanka",
+    "camera_id": "CAM_BLR_010",
+    "confidence_score": 0.86,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

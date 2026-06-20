@@ -1,0 +1,22 @@
+{
+    "violation_id": "91d71fe8-ab3e-40fa-8843-072db134fc06",
+    "challan_id": "CHN-2026-00009",
+    "plate_number": "TS08P2760",
+    "violation_type": "HELMET_VIOLATION",
+    "type": "HELMET_VIOLATION",
+    "details": "Rider #1 without helmet (missing_conf=0.85, reason=Insufficient head coverage)",
+    "date": "2026-06-20",
+    "time": "15:05:59",
+    "location": "Silk Board",
+    "camera_id": "CAM_BLR_001",
+    "confidence_score": 0.85,
+    "ocr_confidence": 0.7476272101323177,
+    "ocr_engine": "easyocr",
+    "fine_amount": 1000,
+    "status": "PENDING",
+    "plate_crop_path": "outputs/evidence/91d71fe8-ab3e-40fa-8843-072db134fc06/plate_crop.jpg",
+    "enhanced_plate_path": "outputs/evidence/91d71fe8-ab3e-40fa-8843-072db134fc06/enhanced_plate.jpg",
+    "ocr_result_path": "outputs/evidence/91d71fe8-ab3e-40fa-8843-072db134fc06/ocr_result.jpg",
+    "original_full_path": "outputs/evidence/91d71fe8-ab3e-40fa-8843-072db134fc06/original_full.jpg",
+    "annotated_full_path": "outputs/evidence/91d71fe8-ab3e-40fa-8843-072db134fc06/annotated_full.jpg"
+}

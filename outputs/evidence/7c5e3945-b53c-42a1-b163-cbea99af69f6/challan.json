@@ -1,0 +1,15 @@
+{
+    "violation_id": "7c5e3945-b53c-42a1-b163-cbea99af69f6",
+    "challan_id": "CHN-2026-00662",
+    "plate_number": "KA75RD6228",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-14",
+    "time": "19:38:05",
+    "location": "Majestic",
+    "camera_id": "CAM_BLR_009",
+    "confidence_score": 0.94,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "1953561c-453e-4c44-8d60-ab931b6af46b",
+    "challan_id": "CHN-2026-00452",
+    "plate_number": "KA74HT1710",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-02",
+    "time": "17:10:43",
+    "location": "Hebbal",
+    "camera_id": "CAM_BLR_005",
+    "confidence_score": 0.97,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

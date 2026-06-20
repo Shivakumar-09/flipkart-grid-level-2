@@ -1,0 +1,15 @@
+{
+    "violation_id": "a7a43282-dbd4-4673-b76a-c4c9c3af0e7c",
+    "challan_id": "CHN-2026-00358",
+    "plate_number": "KA44NP8736",
+    "violation_type": "ILLEGAL_PARKING",
+    "type": "ILLEGAL_PARKING",
+    "details": "Illegal Parking recorded",
+    "date": "2026-06-04",
+    "time": "19:53:24",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.9,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

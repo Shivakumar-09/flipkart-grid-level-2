@@ -1,0 +1,15 @@
+{
+    "violation_id": "3293e796-95bc-4ce4-a543-b71f2830a862",
+    "challan_id": "CHN-2026-00572",
+    "plate_number": "KA67TA2298",
+    "violation_type": "WRONG_SIDE_DRIVING",
+    "type": "WRONG_SIDE_DRIVING",
+    "details": "Wrong Side Driving recorded",
+    "date": "2026-06-07",
+    "time": "17:24:42",
+    "location": "KR Puram",
+    "camera_id": "CAM_BLR_006",
+    "confidence_score": 0.87,
+    "fine_amount": 5000,
+    "status": "PENDING"
+}

@@ -1,0 +1,15 @@
+{
+    "violation_id": "61db92e4-29d2-4753-b0f1-7caf22db2f38",
+    "challan_id": "CHN-2026-00644",
+    "plate_number": "KA31FK4694",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-06",
+    "time": "22:57:42",
+    "location": "HSR Layout",
+    "camera_id": "CAM_BLR_008",
+    "confidence_score": 0.87,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}

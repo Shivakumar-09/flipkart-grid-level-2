@@ -1,0 +1,15 @@
+{
+    "violation_id": "9097e812-88fb-44c5-b5fb-40e48fa4dca6",
+    "challan_id": "CHN-2026-00394",
+    "plate_number": "KA46VR3588",
+    "violation_type": "SEATBELT_VIOLATION",
+    "type": "SEATBELT_VIOLATION",
+    "details": "Seatbelt Violation recorded",
+    "date": "2026-06-12",
+    "time": "00:49:19",
+    "location": "Marathahalli",
+    "camera_id": "CAM_BLR_004",
+    "confidence_score": 0.85,
+    "fine_amount": 1000,
+    "status": "PENDING"
+}
