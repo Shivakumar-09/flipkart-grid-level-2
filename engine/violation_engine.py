@@ -3,13 +3,6 @@ import time
 import logging
 import numpy as np
 import os
-from models.vehicle_detector import VehicleDetector
-from models.helmet_detector import HelmetDetector
-from models.triple_riding_detector import TripleRidingDetector
-from models.parking_detector import ParkingDetector
-from models.ocr_engine import OcrEngine
-from models.seatbelt_detector import SeatbeltDetector
-from models.traffic_light_detector import TrafficLightDetector
 from datetime import datetime
 import uuid
 from utils.runtime import empty_stage_profile, add_ms, get_resource_snapshot
@@ -18,18 +11,17 @@ logger = logging.getLogger("ViolationEngine")
 
 class ViolationEngine:
     def __init__(self):
-        logger.info("Initializing Violation Engine and loading detection modules...")
-        self.vehicle_detector = VehicleDetector()
-        self.helmet_detector = HelmetDetector()
-        self.triple_riding_detector = TripleRidingDetector()
-        self.parking_detector = ParkingDetector()
-        self.ocr_engine = OcrEngine()
-        self.seatbelt_detector = SeatbeltDetector()
-        self.traffic_light_detector = TrafficLightDetector()
+        logger.info("Initializing Violation Engine (detection modules will load lazily)...")
+        self._vehicle_detector = None
+        self._helmet_detector = None
+        self._triple_riding_detector = None
+        self._parking_detector = None
+        self._ocr_engine = None
+        self._seatbelt_detector = None
+        self._traffic_light_detector = None
         self.max_inference_width = int(os.environ.get("TRAFFICFLOW_MAX_INFERENCE_WIDTH", "1280"))
-        
-        import json
         self.camera_locations = {}
+        import json
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             proj_root = os.path.dirname(current_dir)
@@ -37,8 +29,55 @@ class ViolationEngine:
                 self.camera_locations = json.load(f)
         except Exception as e:
             logger.error(f"Failed to load camera_locations.json in ViolationEngine: {e}")
-            
-        logger.info("All detection modules loaded successfully.")
+
+    @property
+    def vehicle_detector(self):
+        if self._vehicle_detector is None:
+            from models.vehicle_detector import VehicleDetector
+            self._vehicle_detector = VehicleDetector()
+        return self._vehicle_detector
+
+    @property
+    def helmet_detector(self):
+        if self._helmet_detector is None:
+            from models.helmet_detector import HelmetDetector
+            self._helmet_detector = HelmetDetector()
+        return self._helmet_detector
+
+    @property
+    def triple_riding_detector(self):
+        if self._triple_riding_detector is None:
+            from models.triple_riding_detector import TripleRidingDetector
+            self._triple_riding_detector = TripleRidingDetector()
+        return self._triple_riding_detector
+
+    @property
+    def parking_detector(self):
+        if self._parking_detector is None:
+            from models.parking_detector import ParkingDetector
+            self._parking_detector = ParkingDetector()
+        return self._parking_detector
+
+    @property
+    def ocr_engine(self):
+        if self._ocr_engine is None:
+            from models.ocr_engine import OcrEngine
+            self._ocr_engine = OcrEngine()
+        return self._ocr_engine
+
+    @property
+    def seatbelt_detector(self):
+        if self._seatbelt_detector is None:
+            from models.seatbelt_detector import SeatbeltDetector
+            self._seatbelt_detector = SeatbeltDetector()
+        return self._seatbelt_detector
+
+    @property
+    def traffic_light_detector(self):
+        if self._traffic_light_detector is None:
+            from models.traffic_light_detector import TrafficLightDetector
+            self._traffic_light_detector = TrafficLightDetector()
+        return self._traffic_light_detector
 
     def _resize_for_inference(self, image):
         h, w = image.shape[:2]

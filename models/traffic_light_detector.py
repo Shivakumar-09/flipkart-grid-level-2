@@ -76,9 +76,9 @@ class TrafficLightDetector:
         """
         h, w = image.shape[:2]
         
-        # Default ROI: upper portion of image where traffic lights are typically located
+        # Default ROI: upper portion of image where traffic lights are typically located (restricted to top 25%)
         if roi is None:
-            search_region = image[0:int(h * 0.45), :]
+            search_region = image[0:int(h * 0.25), :]
             roi_offset = (0, 0)
         else:
             rx1, ry1, rx2, ry2 = roi
@@ -124,6 +124,11 @@ class TrafficLightDetector:
         max_color = max(areas, key=areas.get)
         max_area = areas[max_color]
         
+        # Ignore large yellow regions to prevent false triggers from ambient backgrounds, signs, vehicles
+        if max_color == "YELLOW" and max_area > total_area * 0.05:
+            logger.info(f"Traffic light: yellow region too large ({max_area}px / {total_area}px) — returning UNKNOWN to prevent false positives.")
+            return "UNKNOWN", 0.0, None
+
         if max_area < min_area:
             logger.info("Traffic light: no dominant color area found — returning UNKNOWN")
             return "UNKNOWN", 0.0, None
@@ -196,10 +201,14 @@ class TrafficLightDetector:
             if not (0.5 <= aspect <= 2.0):
                 continue
             
+            # Height and width check: require circular bounding box dimensions strictly > 20px
+            if bw <= 20 or bh <= 20:
+                continue
+            
             # Circularity check: 4π * area / perimeter²
-            # Perfect circle ≈ 1.0; traffic lights in practice ≥ 0.55
+            # Perfect circle ≈ 1.0; traffic lights in practice ≥ 0.60
             circularity = 4 * np.pi * area / (perimeter * perimeter)
-            if circularity < 0.55:
+            if circularity < 0.60:
                 continue
             
             score = circularity * area  # Prefer large, circular blobs
@@ -332,7 +341,7 @@ class TrafficLightDetector:
     def check_stop_line_violation(self, image, vehicle_box, vehicle_label="car",
                                   camera_id="CAM_BLR_001", detection_confidence=0.90,
                                   mock_result=None, signal_state="RED",
-                                  signal_confidence=0.0):
+                                  signal_confidence=0.90):
         """
         Detect whether a vehicle's front bumper has crossed the configured
         camera stop line during a RED traffic signal.

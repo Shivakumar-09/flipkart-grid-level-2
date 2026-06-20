@@ -66,13 +66,22 @@ class OcrEngine:
         os.makedirs(self.debug_dir, exist_ok=True)
         os.makedirs(self.outputs_debug_dir, exist_ok=True)
 
+        # Defer loading to first inference run to optimize startup RAM
+        self._lazy_loaded = False
+
+    def _lazy_load_all(self):
+        if self._lazy_loaded:
+            return
+        logger.info("Performing lazy loading of all OCR engines and detectors...")
         self._load_easyocr_reader()
         self._load_paddleocr_reader()
         self._load_tesseract()
-
         self._load_plate_detector()
+        self._lazy_loaded = True
 
     def _load_easyocr_reader(self):
+        if self.easy_loaded:
+            return
         try:
             import easyocr
             import warnings
@@ -89,35 +98,12 @@ class OcrEngine:
             logger.warning(f"Could not load EasyOCR: {e}. EasyOCR attempts disabled.")
 
     def _load_paddleocr_reader(self):
-        try:
-            from paddleocr import PaddleOCR
-            key = ("en", bool(self.use_gpu))
-            with _OCR_CACHE_LOCK:
-                if key not in _PADDLE_READER_CACHE:
-                    try:
-                        _PADDLE_READER_CACHE[key] = PaddleOCR(
-                            use_angle_cls=True,
-                            lang="en",
-                            show_log=False,
-                            use_gpu=self.use_gpu
-                        )
-                    except TypeError:
-                        try:
-                            _PADDLE_READER_CACHE[key] = PaddleOCR(
-                                use_angle_cls=True,
-                                lang="en",
-                                use_gpu=self.use_gpu
-                            )
-                        except TypeError:
-                            _PADDLE_READER_CACHE[key] = PaddleOCR(use_angle_cls=True, lang="en")
-                self.paddle_reader = _PADDLE_READER_CACHE[key]
-            self.paddle_loaded = True
-            logger.info(f"PaddleOCR engine ready on {'GPU' if self.use_gpu else 'CPU'} from cache.")
-        except Exception as e:
-            self.paddle_error = str(e)
-            logger.info(f"Could not load PaddleOCR: {e}. PaddleOCR attempts disabled.")
+        self.paddle_loaded = False
+        self.paddle_error = "PaddleOCR completely disabled for memory optimization."
 
     def _load_tesseract(self):
+        if self.tesseract_loaded:
+            return
         try:
             import pytesseract
             tess_exe = pytesseract.pytesseract.tesseract_cmd
@@ -135,6 +121,8 @@ class OcrEngine:
             logger.warning(f"Could not load Tesseract OCR: {e}")
 
     def _load_plate_detector(self):
+        if self.plate_model is not None:
+            return
         detector_candidates = [
             (
                 "license_plate_detector.pt",
@@ -167,20 +155,36 @@ class OcrEngine:
         self.plate_model_error = "; ".join(errors) or "no plate detector candidates configured"
         logger.error(f"Failed to load YOLOv8 license plate model: {self.plate_model_error}")
 
-    def extract_plate(self, image, vehicle_box):
-        """
-        Backward-compatible wrapper used by older code.
-        Returns (plate_text, confidence, cropped_plate).
-        """
-        text, confidence, cropped_plate, _ = self.extract_plate_details(image, vehicle_box)
-        return text, confidence, cropped_plate
-
     def extract_plate_details(self, image, vehicle_box, debug_name=None):
         """
-        Vehicle -> plate localization -> enhancement -> EasyOCR/PaddleOCR comparison.
+        Vehicle -> plate localization -> enhancement -> EasyOCR comparison.
         Returns (plate_text, confidence, cropped_plate, diagnostics).
         """
+        self._lazy_load_all()
         total_started = time.perf_counter()
+
+        # 1. Skip OCR for vehicles smaller than 150x50 pixels
+        if vehicle_box is not None:
+            vx1, vy1, vx2, vy2 = vehicle_box
+            w_box = vx2 - vx1
+            h_box = vy2 - vy1
+            if w_box < 150 or h_box < 50:
+                logger.info(f"Skipping OCR: vehicle crop size {w_box}x{h_box} is smaller than 150x50 threshold.")
+                diagnostics = self._new_diagnostics(image, vehicle_box)
+                diagnostics["failure_reason"] = "vehicle_too_small"
+                self.last_debug = diagnostics
+                return "UNKNOWN", 0.0, None, diagnostics
+
+        # 2. Resize incoming image to max width 1280
+        if image is not None:
+            h_orig, w_orig = image.shape[:2]
+            if w_orig > 1280:
+                scale = 1280.0 / w_orig
+                image = cv2.resize(image, (1280, int(h_orig * scale)), interpolation=cv2.INTER_AREA)
+                # Re-scale vehicle box to match the resized image
+                if vehicle_box is not None:
+                    vehicle_box = [int(v * scale) for v in vehicle_box]
+
         diagnostics = self._new_diagnostics(image, vehicle_box)
         run_debug_dir, run_outputs_debug_dir = self._prepare_debug_dirs(debug_name)
 
@@ -704,10 +708,15 @@ class OcrEngine:
         ocr_start_time = time.perf_counter()
         
         for idx, candidate in enumerate(candidates[:3]):
-            if time.perf_counter() - ocr_start_time >= 2.5:
+            if time.perf_counter() - ocr_start_time >= 0.5:
                 logger.info("OCR global candidates evaluation timeout reached. Stopping candidate search.")
                 break
                 
+            # Skip candidates with low plate confidence
+            if candidate["source"] == "yolov8_license_plate" and candidate.get("confidence", 0.0) < 0.40:
+                logger.info(f"Skipping candidate {candidate['source']} with low confidence {candidate.get('confidence', 0.0):.2f}")
+                continue
+
             crop = self._crop_with_padding(vehicle_crop, candidate["box"], candidate.get("padding", 0.15))
             if crop is None or crop.size == 0:
                 continue
@@ -793,7 +802,7 @@ class OcrEngine:
             all_attempts,
             key=lambda item: self._candidate_rank(item.get("text", ""), item.get("confidence", 0.0)),
             reverse=True
-        )[:40]
+        )[:10]
         return best
 
     def _get_ocr_v3_variants(self, crop):
@@ -1029,7 +1038,7 @@ class OcrEngine:
             return 255 - image
         return image
 
-    def _run_ocr_attempts(self, variants, start_time_global, timeout=2.5):
+    def _run_ocr_attempts(self, variants, start_time_global, timeout=0.5):
         attempts = []
         easyocr_calls = 0
         for variant in variants:
@@ -1053,8 +1062,6 @@ class OcrEngine:
                 if easyocr_calls < 4:
                     tasks.append(("easyocr", self._run_easyocr))
                     easyocr_calls += 1
-            if self.paddle_loaded and self.paddle_reader is not None:
-                tasks.append(("paddleocr", self._run_paddleocr))
             if self.tesseract_loaded:
                 tasks.append(("tesseract", self._run_tesseract))
 
@@ -1073,8 +1080,9 @@ class OcrEngine:
                 for _, fn in tasks:
                     attempts.extend(fn(image, variant_name))
 
-            # Early Exit inside variants loop
-            if any(self._is_valid_plate(a.get("text", "")) and a.get("confidence", 0.0) >= self.high_confidence_cutoff for a in attempts):
+            # Early Exit inside variants loop on first valid Indian plate match
+            if any(self._is_valid_plate(a.get("text", "")) for a in attempts):
+                logger.info("Found a valid Indian plate. Disabling further variant processing.")
                 return attempts
         return attempts
 

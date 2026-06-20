@@ -17,47 +17,94 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 # Database configuration URL
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and ("localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL):
+    logger.warning("DATABASE_URL contains localhost or 127.0.0.1. Fallback to local PostgreSQL is disabled.")
+    DATABASE_URL = None
+
 if not DATABASE_URL:
-    logger.warning("DATABASE_URL environment variable is not set. Defaulting to local PostgreSQL default.")
-    DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/trafficflow"
+    logger.warning("DATABASE_URL environment variable is not set. Database integration is disabled.")
+
+class DummySessionMaker:
+    def __call__(self):
+        class DummySession:
+            def query(self, *args, **kwargs):
+                class DummyQuery:
+                    def join(self, *args, **kwargs): return self
+                    def order_by(self, *args, **kwargs): return self
+                    def limit(self, *args, **kwargs): return self
+                    def all(self): return []
+                    def count(self): return 0
+                    def first(self): return None
+                return DummyQuery()
+            def add(self, *args, **kwargs): pass
+            def commit(self, *args, **kwargs): pass
+            def rollback(self, *args, **kwargs): pass
+            def close(self, *args, **kwargs): pass
+        return DummySession()
 
 # Database Engine initialization with pooling and reconnect logic
 engine = None
 SessionLocal = None
 Base = declarative_base()
 
-def initialize_database(max_retries=5, delay=3):
+def initialize_database(max_retries=1, delay=1):
     global engine, SessionLocal
-    last_err = None
+    if not DATABASE_URL:
+        logger.warning("No DATABASE_URL set. Using DummySessionMaker for fallback.")
+        SessionLocal = DummySessionMaker()
+        return False
+        
+    logger.info("Connecting to database...")
     
-    logger.info(f"Connecting to database at host: {DATABASE_URL.split('@')[-1].split('/')[0]}...")
-    
-    for attempt in range(1, max_retries + 1):
+    try:
+        engine = create_engine(
+            DATABASE_URL,
+            pool_size=2,
+            max_overflow=4,
+            pool_timeout=30,
+            pool_recycle=1800,
+            pool_pre_ping=True
+        )
+        
+        # Check connection once, do not block startup with multiple retries if unavailable
         try:
-            # Setup engine with robust connection pooling
-            engine = create_engine(
-                DATABASE_URL,
-                pool_size=10,
-                max_overflow=20,
-                pool_timeout=30,
-                pool_recycle=1800,
-                pool_pre_ping=True
-            )
-            
-            # Simple connection check
             with engine.connect() as conn:
-                logger.info("Successfully connected to Render PostgreSQL Cloud Database.")
-                
+                logger.info("Successfully connected to PostgreSQL Database.")
             SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             return True
         except Exception as e:
-            last_err = e
-            logger.warning(f"Connection attempt {attempt} failed: {e}. Retrying in {delay}s...")
-            time.sleep(delay)
-            
-    logger.critical("Failed to connect to PostgreSQL Cloud Database after multiple attempts.")
-    raise last_err
+            logger.error(f"Failed to connect to PostgreSQL Database on startup: {e}. Falling back to DummySessionMaker.")
+            SessionLocal = DummySessionMaker()
+            return False
+    except Exception as e:
+        logger.error(f"Error initializing PostgreSQL engine: {e}. Falling back to DummySessionMaker.")
+        SessionLocal = DummySessionMaker()
+        return False
+
+def database_health_check():
+    """
+    Check if the database is connected.
+    Returns: "CONNECTED" or "DISCONNECTED"
+    """
+    if not DATABASE_URL or engine is None:
+        return "DISCONNECTED"
+    try:
+        with engine.connect() as conn:
+            from sqlalchemy import text
+            conn.execute(text("SELECT 1"))
+            return "CONNECTED"
+    except Exception:
+        return "DISCONNECTED"
+
+def database_health():
+    """
+    Check if the database is connected.
+    Returns: {"connected": True/False}
+    """
+    return {
+        "connected": database_health_check() == "CONNECTED"
+    }
 
 # --- SQLAlchemy Model Declarations ---
 

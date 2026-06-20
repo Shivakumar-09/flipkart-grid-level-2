@@ -1,4 +1,5 @@
 import os
+os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
 from dotenv import load_dotenv
 load_dotenv()
 import csv
@@ -8,8 +9,40 @@ import uuid
 import warnings
 import numpy as np
 import time
+import threading
 from datetime import datetime, timedelta, time as time_type
 from functools import lru_cache, wraps
+
+# Global flag to track active uploads (prevents cache warming resource spikes)
+_is_uploading = False
+_cache_warming_lock = threading.Lock()
+
+def make_json_safe(obj):
+    import numpy as np
+    from datetime import datetime
+
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+
+    if isinstance(obj, np.integer):
+        return int(obj)
+
+    if isinstance(obj, np.floating):
+        return float(obj)
+
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+
+    if isinstance(obj, dict):
+        return {k: make_json_safe(v) for k,v in obj.items()}
+
+    if isinstance(obj, (list, tuple)):
+        return [make_json_safe(x) for x in obj]
+
+    return obj
 from flask import Flask, request, jsonify, render_template, send_from_directory, Response, has_request_context
 from flask_compress import Compress
 from sqlalchemy import func
@@ -248,7 +281,10 @@ def index():
 @app.route('/health', methods=['GET'])
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({"status": "healthy"})
+    return jsonify({
+        "status": "healthy",
+        "service": "TrafficFlow"
+    })
 
 # API: Summary Metrics
 @app.route('/api/metrics', methods=['GET'])
@@ -512,34 +548,36 @@ def get_logs():
 # API: Image/Video Upload violation analysis pipeline (Phase 9 & Phase 1)
 @app.route('/api/upload', methods=['POST'])
 def upload_frame():
-    print("UPLOAD RECEIVED")
-    _cache_store.clear()
-    _cache_timestamps.clear()
-    import time
-    if violation_engine is None or evidence_engine is None:
-        return jsonify({"error": "AI Inference engines are offline or loading"}), 503
-        
-    if 'image' not in request.files:
-        return jsonify({"error": "No image or video file provided"}), 400
-        
-    file = request.files['image']
-    if file.filename == '':
-        return jsonify({"error": "Empty filename"}), 400
-        
-    camera_id = request.form.get("camera_id", "CAM_BLR_001")
-    if camera_id not in CAMERA_LOCATIONS:
-        camera_id = "CAM_BLR_001"
-    location = CAMERA_LOCATIONS[camera_id]
-    
-    unique_filename = f"{uuid.uuid4()}_{file.filename}"
-    uploads_dir = os.path.join(OUTPUTS_DIR, "uploads")
-    os.makedirs(uploads_dir, exist_ok=True)
-    upload_path = os.path.join(uploads_dir, unique_filename)
-    file.save(upload_path)
-    
-    is_video = file.filename.lower().split('.')[-1] in ['mp4', 'avi', 'mov', 'mkv']
-    
+    global _is_uploading
+    _is_uploading = True
     try:
+        print("UPLOAD RECEIVED")
+        _cache_store.clear()
+        _cache_timestamps.clear()
+        import time
+        if violation_engine is None or evidence_engine is None:
+            return jsonify({"error": "AI Inference engines are offline or loading"}), 503
+            
+        if 'image' not in request.files:
+            return jsonify({"error": "No image or video file provided"}), 400
+            
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({"error": "Empty filename"}), 400
+            
+        camera_id = request.form.get("camera_id", "CAM_BLR_001")
+        if camera_id not in CAMERA_LOCATIONS:
+            camera_id = "CAM_BLR_001"
+        location = CAMERA_LOCATIONS[camera_id]
+        
+        unique_filename = f"{uuid.uuid4()}_{file.filename}"
+        uploads_dir = os.path.join(OUTPUTS_DIR, "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        upload_path = os.path.join(uploads_dir, unique_filename)
+        file.save(upload_path)
+        
+        is_video = file.filename.lower().split('.')[-1] in ['mp4', 'avi', 'mov', 'mkv']
+        
         if is_video:
             print("PROCESSING VIDEO")
             # Open Video
@@ -646,9 +684,8 @@ def upload_frame():
             # Rel Paths
             rel_video_path = f"outputs/evidence/{violation_id}/{annotated_video_filename}"
             
-            # Return JSON
-            print("RETURNING RESPONSE")
-            return jsonify({
+            # Construct response dictionary
+            response_data = {
                 "status": "success",
                 "success": True,
                 "processing_time_ms": int((time.time() - processing_start) * 1000),
@@ -664,7 +701,21 @@ def upload_frame():
                 "challan_id": recorded_violations[-1].get("challan_id", "NONE") if recorded_violations else "NONE",
                 "ocr_confidence": recorded_violations[-1].get("ocr_confidence", 0.0) if recorded_violations else 0.0,
                 "notifications_sent": sent_notifications
-            })
+            }
+
+            # Clear image buffers from memory
+            if 'first_frame' in locals():
+                del first_frame
+            if 'mock_process_result' in locals():
+                del mock_process_result
+            import gc
+            gc.collect()
+
+            for k,v in response_data.items():
+                print(f"{k}: {type(v)}")
+
+            response_data = make_json_safe(response_data)
+            return jsonify(response_data)
             
         else:
             # Process single image
@@ -787,7 +838,7 @@ def upload_frame():
                 rel_img_path = f"outputs/evidence/{clean_filename}"
                 
             print("RETURNING RESPONSE")
-            return jsonify({
+            response_data = {
                 "status": "success",
                 "success": True,
                 "processing_time_ms": process_result["processing_time_ms"],
@@ -806,7 +857,22 @@ def upload_frame():
                 "ocr_debug": process_result.get("ocr_debug", {}),
                 "ocr_debug_paths": process_result.get("ocr_debug_paths", {}),
                 "notifications_sent": sent_notifications
-            })
+            }
+
+            # Clear image buffers from memory
+            if "original_image" in process_result:
+                process_result["original_image"] = None
+            if "annotated_image" in process_result:
+                process_result["annotated_image"] = None
+            del process_result
+            import gc
+            gc.collect()
+
+            for k,v in response_data.items():
+                print(f"{k}: {type(v)}")
+
+            response_data = make_json_safe(response_data)
+            return jsonify(response_data)
             
     except Exception as e:
         import traceback
@@ -815,6 +881,8 @@ def upload_frame():
         print("="*80)
         logger.error(f"Failed to process uploaded file: {e}")
         return jsonify({"error": f"Internal pipeline execution error: {str(e)}"}), 500
+    finally:
+        _is_uploading = False
 
 # API: Export violations to CSV file
 @app.route('/api/export/csv', methods=['GET'])
@@ -1662,33 +1730,39 @@ import time
 def start_cache_warming_thread(app_instance):
     def run_warming():
         logger.info("Background cache warming thread started.")
-        # Wait 3 seconds to let Flask server bind and initialize completely
-        time.sleep(3)
+        # Wait 5 seconds to let Flask server bind and initialize completely
+        time.sleep(5)
         
         while True:
-            try:
-                with app_instance.app_context():
-                    logger.info("Warming API caches from PostgreSQL database...")
-                    t0 = time.time()
-                    
-                    # Force executes and caches Flask GET handlers under app_context
-                    get_metrics()
-                    get_charts()
-                    get_analytics_details()
-                    get_command_center()
-                    get_detailed_charts()
-                    get_logs()
-                    get_repeat_offenders_api()
-                    get_deployed_patrols()
-                    get_recommendations()
-                    get_evaluation_details()
-                    
-                    logger.info(f"API caches warmed successfully in {time.time() - t0:.2f} seconds.")
-            except Exception as e:
-                logger.error(f"Error in background cache warming: {e}")
+            # Skip cache warming if an upload inference task is active to avoid resource spike
+            if _is_uploading:
+                time.sleep(10)
+                continue
+                
+            with _cache_warming_lock:
+                try:
+                    with app_instance.app_context():
+                        logger.info("Warming API caches from PostgreSQL database...")
+                        t0 = time.time()
+                        
+                        # Force executes and caches Flask GET handlers under app_context
+                        get_metrics()
+                        get_charts()
+                        get_analytics_details()
+                        get_command_center()
+                        get_detailed_charts()
+                        get_logs()
+                        get_repeat_offenders_api()
+                        get_deployed_patrols()
+                        get_recommendations()
+                        get_evaluation_details()
+                        
+                        logger.info(f"API caches warmed successfully in {time.time() - t0:.2f} seconds.")
+                except Exception as e:
+                    logger.error(f"Error in background cache warming: {e}")
             
-            # Refresh every 30 seconds
-            time.sleep(30)
+            # Refresh every 15 minutes (900 seconds)
+            time.sleep(900)
             
     t = threading.Thread(target=run_warming, daemon=True)
     t.start()
@@ -1700,6 +1774,6 @@ start_cache_warming_thread(app)
 
 if __name__ == '__main__':
     # Local development server
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     debug_mode = not _is_production
     app.run(host='0.0.0.0', port=port, debug=debug_mode, use_reloader=False)

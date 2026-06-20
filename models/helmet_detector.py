@@ -16,11 +16,15 @@ class HelmetDetector:
         self.model = None
         self.is_loaded = False
         self.device = "cpu"
+
+    def _load_model(self):
+        if self.is_loaded:
+            return
         try:
-            self.model, self.device, load_ms, from_cache = get_yolo_model(model_path)
+            self.model, self.device, load_ms, from_cache = get_yolo_model(self.model_path)
             self.is_loaded = True
             source = "cache" if from_cache else f"{load_ms:.1f}ms"
-            logger.info(f"YOLOv8 Pose Model ready from {model_path} on {self.device} ({source}).")
+            logger.info(f"YOLOv8 Pose Model ready from {self.model_path} on {self.device} ({source}).")
         except Exception as e:
             logger.warning(f"Could not load YOLOv8-Pose model: {e}. Running in simulation/fallback mode.")
 
@@ -229,6 +233,7 @@ class HelmetDetector:
             head_bbox, helmet_bbox, decision, violation_trigger_reason, metrics, debug_paths
         }
         """
+        self._load_model()
         x1, y1, x2, y2 = person_box
         h, w, _ = image.shape
 

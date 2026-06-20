@@ -11,13 +11,6 @@ class SeatbeltDetector:
         self.model = None
         self.is_loaded = False
         self.device = "cpu"
-        try:
-            self.model, self.device, load_ms, from_cache = get_yolo_model(model_path)
-            self.is_loaded = True
-            source = "cache" if from_cache else f"{load_ms:.1f}ms"
-            logger.info(f"YOLOv8 Pose model ready for seatbelt checks on {self.device} ({source}).")
-        except Exception as e:
-            logger.warning(f"Could not initialize YOLOv8 Pose model: {e}. SeatbeltDetector will use classical CV fallback.")
 
     def detect_seatbelt(self, image, vehicle_box, vehicle_label="car", mock_result=None):
         """

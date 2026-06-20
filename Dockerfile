@@ -28,6 +28,7 @@ ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
 # ── Python dependencies ──────────────────────────────────────
 COPY requirements.txt .
 RUN pip install --upgrade pip --no-cache-dir \
+ && pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
  && pip install --no-cache-dir -r requirements.txt
 
 # ── Copy application source ──────────────────────────────────
@@ -42,7 +43,7 @@ RUN mkdir -p outputs/uploads outputs/debug/helmet challans ocr_debug "$YOLO_CONF
  && chmod +x start.sh
 
 # ── Expose port ──────────────────────────────────────────────
-EXPOSE 5000
+EXPOSE 8080
 
 # ── Start gunicorn ───────────────────────────────────────────
 CMD ["sh", "./start.sh"]
