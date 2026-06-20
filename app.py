@@ -1542,12 +1542,12 @@ def update_challan_plate(challan_id):
 def reset_dispatch():
     session = SessionLocal()
     try:
-        session.query(PatrolDispatch).delete()
+        session.query(PatrolDispatch).delete()\n        session.query(PoliceAlert).delete()\n
         session.commit()
         # Also clear cache to reflect changes immediately
-        for k in list(_api_cache_store.keys()):
+        for k in list(_cache_store.keys()):
             if 'recommendations' in k or 'deployed_patrols' in k:
-                del _api_cache_store[k]
+                del _cache_store[k]
         return jsonify({"status": "success", "message": "All dispatch records cleared."})
     except Exception as e:
         session.rollback()
