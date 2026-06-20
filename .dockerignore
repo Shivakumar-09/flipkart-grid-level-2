@@ -2,7 +2,6 @@
 .github
 __pycache__
 venv
-outputs
 logs
 tests
 docs/reports
