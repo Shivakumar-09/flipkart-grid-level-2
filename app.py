@@ -487,6 +487,29 @@ def get_command_center():
     })
 
 # API: Detailed Chart Statistics (Phase 5, 6 & 7)
+
+@app.route('/api/simulate_history', methods=['GET'])
+def simulate_history():
+    from datetime import datetime, timedelta
+    import random
+    session = SessionLocal()
+    try:
+        violations = session.query(Violation).all()
+        for v in violations:
+            # Spread over last 7 days
+            days_back = random.randint(0, 6)
+            hours_back = random.randint(0, 23)
+            v.timestamp = datetime.now() - timedelta(days=days_back, hours=hours_back)
+        session.commit()
+        # Clear cache
+        _cache_store.clear()
+        return jsonify({"status": "success", "message": f"Simulated history for {len(violations)} violations."})
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
 @app.route('/api/detailed_charts', methods=['GET'])
 @api_cache(timeout=300)
 def get_detailed_charts():
